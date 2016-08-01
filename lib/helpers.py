@@ -15,6 +15,9 @@ from matplotlib import colors
 
 from matplotlib import pyplot as plt
 
+import pickle
+
+
 #### To ensure the working directory starts at where the script is located...
 import os
 abspath = os.path.abspath(__file__) #in lib directory
@@ -25,13 +28,30 @@ os.chdir(dname)
 
 from collections import namedtuple
 
-coord_info = namedtuple('coord_info', ['coord', 'orientation','coherence','energy'])
+
+coord_labels = ['coord', 'orientation', 'coherence', 'energy']
+label2val = {x:i for i,x in enumerate(coord_labels)} #choose things by name
+
+coord_info = namedtuple('coord_info', coord_labels)
 
 
 
 out_dir = os.path.join(dname, 'outputs') #directory for output files
 
 cache_dir = os.path.join(dname, 'cache')
+
+# create directories if necessary
+
+if not os.path.isdir(out_dir):
+    os.mkdir(out_dir)
+
+if not os.path.isdir(cache_dir):
+    os.mkdir(cache_dir)
+    
+
+
+
+
 
 EPSILON = 0.05 #for RGB tuple values, providing a range of color to count as interesting
 MAX = 255 #8-bit
@@ -50,7 +70,7 @@ def get_image(im_flag):
             if im_flag == ANISO_IM:
                 file_name = input("Please state the name of the file corresponding to the Text Images to be input, or enter nothing to quit: \n")
             elif im_flag == DYE_IM:
-                file_name = input('Please input the filename corresponding to the stained image.')
+                file_name = input('Please input the filename (in the dependencies folder) corresponding to the stained image:\n')
             if file_name == '':
                 sys.exit()
             im = Image.open(os.path.join(dep, file_name))
@@ -82,7 +102,7 @@ def get_data():
     while len(fnames) < len(data_names):
         try:
             file_name = input("Please state the name of the file corresponding to the " + str(data_names[len(data_list)]) + " for the image of interest (saved as a Text Image from ImageJ), or enter nothing to quit: \n")
-            with open(os.path.join(g.dep, file_name), 'r') as inf:
+            with open(os.path.join(dep, file_name), 'r') as inf:
                 d_layer = np.loadtxt(inf, delimiter = '\t')
             fnames.append(file_name)
             data_list.append(d_layer)
@@ -91,15 +111,21 @@ def get_data():
         except ValueError:
             print('File structure not recognized! Please ensure the file was spelled correctly and was saved as a Text Image in ImageJ.')
     
+    #TODO: clean up this implementation...
+    
     data_shape = data_list[0].shape
     data_index = np.ndindex(data_shape)
-    tupled_data = np.ndarray(data_shape).tolist()
+    tupled_data = {} #dictionary of data_array_coordinate s --> coord_infos    
+    #tupled_data = np.ndarray(data_shape).tolist()
     
     oris, cohs, eners = data_list
     
-    for i in data_index:
-        c_info = h.coord_info(coord=tuple(reversed(i)), orientation=oris[i], coherence=cohs[i], energy=eners[i])
-        tupled_data[i] = c_info
+    for i in data_index: 
+        c_info = coord_info(coord=tuple(reversed(i)), orientation=oris[i], coherence=cohs[i], energy=eners[i])
+        tupled_data[i] = np.array(c_info)
+        
+    # TODO: combine pixels together to improve signal-to-noise ratio?
+            
         
     return tupled_data
 
@@ -125,6 +151,8 @@ def get_color_of_interest():
                 continue
             elif min(c_rgb) < 0 or max(c_rgb) > 1:
                 print('Error! Numbers does not fall within the expected range of [0,255]. Please try again.')
+                continue
+            break
         except ValueError:
             print('Error! Numbers not entered. Please try again.')
             continue
@@ -154,7 +182,7 @@ def collect_coords_of_interest(image, color):
         match = True
         zipped = zip(im_data[i], color)
         for e in zipped:
-            if abs(e[1]-e[0]) >= EPSILON:
+            if abs(e[1]-e[0]) >= EPSILON: #comparing each element pairwise
                 match = False
                 break
         if match == True:
@@ -164,10 +192,46 @@ def collect_coords_of_interest(image, color):
     return coords
 
 
-def plot_histogram_data(data, coords, bins,predicate):
+def plot_histogram_data(data, coords, fname, title, predicate, bins = 100):
     """
     Bin datapoints corresponding to coordinates from a list (coords) to the data, according to a predicate function (predicate).
-    The predicate function takes in a coord_info namedtuple, and an int for the number of bins.
+    The predicate function takes in a coord_info namedtuple, and outputs a value to be used to build the histogram.
+    plot_histogram_data returns the output of plt.hist()
+    Also saves figure to 'outputs' directory.
     """
+    pred_data = []
+    
+    for c in coords:
+        pred_data.append(predicate(data[c]))
+    
+    hist_data = plt.hist(pred_data, bins)
+    plt.title(title)
+    
+    hist_path = os.path.join(out_dir, fname)
+    # TODO: provide labels to graph...
+#    plt.show()
+    plt.savefig(hist_path)
+#    with open(hist_path, 'w') as inf:
+#    
+    
+    return hist_data
+    
+    
+def weighted_anisotropy(aniso_tuple):
+    """
+    Returns a coherence-weighted energy value.
+    """
+    return aniso_tuple[label2val['coherence']] * aniso_tuple[label2val['energy']]
+
+
+
+def save_to_cache(var, info):
+    """
+    Saves variable to cache directory as a pickled file, for later inspection.
+    """
+    fpath = os.path.join(cache_dir, info)
+    
+    with open(fpath, mode='wb') as outf:
+        pickle.dump(var, outf, pickle.HIGHEST_PROTOCOL)
     
     
