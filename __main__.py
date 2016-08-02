@@ -8,6 +8,7 @@ Finds pixels with specified color and coregisters them with anisotropy data. Pro
 
 
 from lib import helpers as h
+from lib import globe as g
 import numpy as np
 import os
 #from collections import namedtuple
@@ -16,14 +17,15 @@ import os
 np.set_printoptions(precision = 3)
 
 
-
-dep_ims = h.set_up_outputs()
-
+dep_ims = h.set_up_outputs() #also runs ImageJ macros to get OrientationJ measures
 
 
-dye_fname, dye_im = h.get_image(h.DYE_IM)
+
+dye_fname, dye_im = h.get_image(g.DYE_IM)
 im_data_shape = tuple(reversed(dye_im.size))
-color_of_interest = h.get_color_of_interest()
+
+#color_of_interest = h.get_color_of_interest()
+color_of_interest = 'brown'
 
 coords_of_interest = h.collect_coords_of_interest(dye_im, color_of_interest)
 
@@ -43,7 +45,7 @@ h.plot_histogram_data(tupled_data, coords = coords_of_interest, fname = hist_inf
 # All coordinates
 
 hist_info = 'dye_fname={0} all_coordinates histogram.{1}'.format(dye_fname, hist_ftype)
-if not os.path.exists(os.path.join(h.cache_dir, hist_info)):
+if not os.path.exists(os.path.join(g.cache_dir, hist_info)):
     hist_title = 'E*C for for entire image.'
     indexer = np.ndindex(im_data_shape)
     h.plot_histogram_data(tupled_data, coords = indexer, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
@@ -56,5 +58,7 @@ pixels_info = 'dye_fname={0} color_of_interest_(HSV)={1} pixels_of_interest.p'.f
 h.save_to_cache(pixels_of_interest, pixels_info)
 
 
+h.map_marked_pixels(outpath = g.out_dir, coords = coords_of_interest, image_shape = dye_im.size) #debugging
+# TODO: update outpath when batching is implemented
 
 print('Done!')
