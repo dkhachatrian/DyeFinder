@@ -17,6 +17,10 @@ np.set_printoptions(precision = 3)
 
 
 
+dep_ims = h.set_up_outputs()
+
+
+
 dye_fname, dye_im = h.get_image(h.DYE_IM)
 im_data_shape = tuple(reversed(dye_im.size))
 color_of_interest = h.get_color_of_interest()

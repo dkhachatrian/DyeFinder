@@ -157,7 +157,7 @@ def get_color_of_interest():
             print('Error! Numbers not entered. Please try again.')
             continue
     
-    return colors.rgb_to_hsv(c_rgb)
+    return tuple(colors.rgb_to_hsv(c_rgb))
 
 
 
@@ -192,19 +192,21 @@ def collect_coords_of_interest(image, color):
     return coords
 
 
-def plot_histogram_data(data, coords, fname, title, predicate, bins = 100):
+def plot_histogram_data(data, coords, fname, title, predicate, bins = 1000, drange=(0,1)):
     """
     Bin datapoints corresponding to coordinates from a list (coords) to the data, according to a predicate function (predicate).
     The predicate function takes in a coord_info namedtuple, and outputs a value to be used to build the histogram.
     plot_histogram_data returns the output of plt.hist()
     Also saves figure to 'outputs' directory.
     """
+    #TODO: use numpy.histogram2d or numpy.histogramdd instead of plt.hist    
+    
     pred_data = []
     
     for c in coords:
         pred_data.append(predicate(data[c]))
     
-    hist_data = plt.hist(pred_data, bins)
+    hist_data = plt.hist(pred_data, bins, range=drange)
     plt.title(title)
     
     hist_path = os.path.join(out_dir, fname)
@@ -234,4 +236,25 @@ def save_to_cache(var, info):
     with open(fpath, mode='wb') as outf:
         pickle.dump(var, outf, pickle.HIGHEST_PROTOCOL)
     
-    
+
+def set_up_outputs():
+    """
+    For batch running of images in 'dependencies', set up directories in the 'outputs' folder.
+    Returns the path to the image, relative to '/dependencies/'
+    """
+    im_names = []
+    for root, dirs, files in os.walk(dep, topdown = True):
+        if len(files) > 0:
+            #see if there are .tif's (images to be processed) in the root dirctory
+            for f in files:
+                if '.tif' in f:
+                    #make dir for each directory containing tifs, in outputs
+                    rel_path = os.path.relpath(root, dep)
+                    try:
+                        os.makedirs(os.path.join(out_dir, rel_path))
+                    except os.error:
+                        pass #already exists
+                    
+                    im_names.append(os.path.join(rel_path, f)) #remember filepath
+        
+    return im_names
