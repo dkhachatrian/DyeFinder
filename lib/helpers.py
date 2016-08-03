@@ -18,41 +18,68 @@ from matplotlib import pyplot as plt
 import pickle
 import os
 import statistics
-
+import statistics as s
 
 from lib import globe as g
 
 
+# so can throw exception at bad locations
+class HelperException(Exception):
+    pass
 
 
 
-def make_validity_mask(data):
+def make_validity_mask(data, z = 2.8):
     """
     Input: a NumPy array, corresponding to the intensity of its respective image.
-    Returns: a NumPy of type bool, with shape data.shape, where elements marked 'False' were deemed outliers and are to be ignored when performing further analysis.
-    In this case, an 'outlier' is more than two standard deviations above or below the mean.
+    Returns: a NumPy of type bool, with shape data.shape, where elements marked 'False' were deemed outliers and are to be ignored when performing further analysis. Also returns a list of those coordinates marked as outliers.
+    In this case, an 'outlier' is more than z standard deviations above or below the mean.
     (In general, these intensity distributions seem to be strongly right-tailed...)
     """
     
     mean = statistics.mean(data)
     std = statistics.stdev(data, xbar = mean)
     
-    z = 2
     
     low,high = mean-z*std, mean+z*std
     
     valid_mask = np.ndarray(data.shape, dtype = bool)
     valid_mask.fill(True) #most will not be outliers
     
+    outliers = []    
+    
     indexer = np.ndindex(valid_mask.shape)
     
     for i in indexer:
         if data[i] < low or data[i] > high:
             valid_mask[i] = False #marked as outlier
+            outliers.append(i)
 #        else:
 #            valid_mask[i] = True
     
-    return valid_mask
+    return valid_mask, outliers
+
+
+
+def remove_outliers(data, outlier_coords):
+    """
+    Removes from the dictionary of coord-->namedtuple (data) the coordinates contained in outlier_coords. Done in-place.
+    """
+    
+    for c in outlier_coords:
+        data.pop(c)
+
+
+def remove_background(data):
+    """
+    Removes data corresponding to the background of the image (histology slice).
+    A coordinate is considered part of the background if its associated coherence and energy is less than or equal to g.EPSILON.
+    Operation performed in-place.
+    """
+    
+    for k in data:
+        if data[k].coherence <= g.EPSILON and data[k].energy <= g.EPSILON:
+            data.pop(k)
 
 
 
@@ -81,13 +108,13 @@ def get_image(im_flag):
     return file_name, im
     
     
-def get_data():
+def get_aniso_data():
     """
     Prompts user for names of files corresponding to outputs of OrientationJ's parameters: orientation, coherence, and energy.
     Input files are searched for in the script's dependencies folder.
     Input files must haev been saved as a Text Image using ImageJ.
     
-    Returns a NumPy array of the data stacked such that the final axis has the data in order [orientation, coherence, energy].
+    Returns a dict of array coordinate-->coord_info (a namedtuple)
     """
 
     data_names = ['orientation', 'coherence', 'energy']
@@ -285,6 +312,112 @@ def map_marked_pixels(outpath, coords, image_shape):
     im = Image.fromarray(im_data.astype('uint8'))
     im.convert('1')
     
-    fpath = '{0} {1}'.format(outpath, 'dye_marked_pixels.png')
+    fpath = os.path.join(outpath, 'dye_marked_pixels.png')
+    #fpath = '{0}/{1}'.format(outpath, 'dye_marked_pixels.png')
     im.save(fpath)
     #im.show() #debugging
+
+
+def get_coords(data, data_mask, predicate, quant_flag = g.LOW):
+    """
+    Get coords in data that pass a predicate function.
+    data_mask is a data.shape NumPy array that states whether the coordinate in data is valid.
+    predicate takes three arguments: a g.aniso_tuple, a list of means, and a list of standard deviations
+    If too few (<0.001n) coordinates are chosen, instead use a quantile method.
+    """
+    # TODO: is data_mask deprecated? If so, remove from signature
+#    if data.shape[:-1] != data_mask.shape:
+#        raise HelperException("Data and data_mask's shape do not match as expected!")
+#    indexer = np.ndindex(data_mask.shape)
+#    
+#    
+#    #find mean and std of OK values
+#    
+#    
+#    for i in indexer:
+#        if data_mask[i]: #if not removed
+    
+    #find mean and std of remaining values
+    oris, cohs, eners = [c.orientation for c in data.values], [c.coherence for c in data.values], [c.energy for c in data.values]
+    means = g.coord_info(orientation=s.mean(oris), coherence = s.mean(cohs), energy = s.mean(eners))
+    stds = g.coord_info(orientation=s.stdev(oris, xbar = means.orientation), coherence = s.stdev(cohs, xbar = means.coherence), energy = s.stdev(eners, xbar = means.energy))
+    
+    coords = []
+    
+    for k in data:
+        if predicate(data[k], means, stds):
+            coords.append(k)
+
+    method = 'z_score'
+
+    DISC = 0.001    
+    
+    if len(coords) < DISC * len(data):
+        method = 'quantile'
+        coords = []
+        if quant_flag == g.LOW:
+            quants = (0.15, 0.25) # deciles
+        elif quant_flag == g.HIGH:
+            quants = (0.75, 0.85)
+        
+        #faster, by multiplying values of interest
+        anisos_sorted = sorted(data.values(), key = weighted_anisotropy)        
+        indices = (np.multiply(quants, len(anisos_sorted))).astype(int)
+        
+        coords = [x.coord for x in anisos_sorted[indices.min():indices.max()]]
+        
+        # slow but most thorough
+#        cohs_sorted = sorted(data.values(), key = lambda x: x.coherence)
+#        eners_sorted = sorted(data.values(), key = lambda x: x.energy)
+#        
+#        indices = (np.multiply(quants, len(cohs_sorted))).astype(int)
+#        
+#        coords = [x.coord for x in cohs_sorted[indices.min():indices.max()] if x in eners_sorted] # O(n**2) ...
+        
+        
+        
+    
+    return coords, method
+    
+
+
+
+
+def has_low_aniso(aniso_tuple, means, stds, z_bounds = (1.5,2.5)):
+    """
+    Returns whether the tuple has low anisotropy, characterized by being within z_bounds standard deviations *below* the mean. Also passed in: means and standard deviations for orientation, coherence, energy.
+    """
+    z_proper = np.multiply(z_bounds, -1)
+    return has_high_aniso(aniso_tuple, means, stds, z_bounds = z_proper)
+
+def has_high_aniso(aniso_tuple, means, stds, z_bounds = (1.5,2.5)):
+    """
+    Returns whether the tuple has low anisotropy, characterized by high energy and high coherency.
+    Also passed in: means and standard deviations for orientation, coherence, energy.
+    """
+    adict,mdict,sdict = aniso_tuple._asdict(), means._asdict(), stds._asdict() #maybe I can get around having to use a _'d method...
+    for k in adict:
+        if k == 'coord' or k == 'orientation':
+            continue #don't care about these for now
+        if not falls_in_zrange(adict[k], mdict[k], sdict[k], z_bounds):
+            return False
+    #if got here, falls in proper range for all cases
+    return True
+    
+    
+
+def give_quantile_range(data, low, high):
+    """
+    Returns values between the low'th percentile and high'th percentile
+    """    
+    
+    
+def falls_in_zrange(val, mean, std, z_bounds):
+    return (val > (mean + std*min(z_bounds)) and val < (mean + std*max(z_bounds)))
+
+
+def dict2np_arr(d):
+    """
+    Converts a dictionary of (NumPy coordinates) --> coord_info namedtuple into a NumPy array ...
+    """
+    pass #not yet convinced I will actually need to perform this conversion...

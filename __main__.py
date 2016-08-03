@@ -30,16 +30,31 @@ color_of_interest = 'brown'
 coords_of_interest = h.collect_coords_of_interest(dye_im, color_of_interest)
 
 
-#aniso_fname, aniso_im = h.get_image(h.ANISO_IM)
 
-tupled_data = h.get_data() #for anisotropy data
+#anisotropy...
+
+aniso_data = h.get_aniso_data() #for anisotropy data
+aniso_fname, aniso_im = h.get_image(h.ANISO_IM)
+
+validity_mask, outlier_coords = h.make_validity_mask(np.array(aniso_im.convert('L')))
+
+
+h.remove_outliers(data = aniso_data, outlier_coords)
+h.remove_background(data = aniso_data)
+
+
+coords_of_interest = [c for c in coords_of_interest if c not in outlier_coords]
+
+high_aniso_coords, method_high = h.get_coords(aniso_data, data_mask = validity_mask, predicate = h.has_high_aniso) #eg, in this case, white matter
+low_aniso_coords, method_low = h.get_coords(aniso_data, data_mask = validity_mask, predicate = h.has_low_aniso) #eg, in this case, gray matter
+
 
 hist_ftype = 'PNG'
 
 # Coordinates of Interest
 hist_info = 'dye_fname={0} color_of_interest_(HSV)={1} coords_of_interest histogram.{2}'.format(dye_fname, color_of_interest, hist_ftype)
 hist_title = 'E*C for within specified color threshold.'
-h.plot_histogram_data(tupled_data, coords = coords_of_interest, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
+h.plot_histogram_data(aniso_data, coords = coords_of_interest, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
 
 
 # All coordinates
@@ -48,7 +63,7 @@ hist_info = 'dye_fname={0} all_coordinates histogram.{1}'.format(dye_fname, hist
 if not os.path.exists(os.path.join(g.cache_dir, hist_info)):
     hist_title = 'E*C for for entire image.'
     indexer = np.ndindex(im_data_shape)
-    h.plot_histogram_data(tupled_data, coords = indexer, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
+    h.plot_histogram_data(aniso_data, coords = indexer, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
     
 
 

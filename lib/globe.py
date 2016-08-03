@@ -34,7 +34,7 @@ if not os.path.isdir(cache_dir):
     os.mkdir(cache_dir)
     
 
-
+EPSILON = 0.01 #for use in removing background
 
 color2hsv_thresh = { 'brown': [(9,23),(63,209),(0,196)] } #
 
@@ -43,3 +43,7 @@ MAX = 255 #8-bit
 
 DYE_IM = 1
 ANISO_IM = 2
+
+
+LOW = 'l'
+HIGH = 'h'
