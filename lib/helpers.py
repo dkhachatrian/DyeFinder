@@ -17,7 +17,6 @@ from matplotlib import pyplot as plt
 
 import pickle
 import os
-import statistics
 import statistics as s
 
 from lib import globe as g
@@ -29,19 +28,21 @@ class HelperException(Exception):
 
 
 
-def make_validity_mask(data, z = 2.8):
+def make_validity_mask(data, z = 3):
     """
     Input: a NumPy array, corresponding to the intensity of its respective image.
     Returns: a NumPy of type bool, with shape data.shape, where elements marked 'False' were deemed outliers and are to be ignored when performing further analysis. Also returns a list of those coordinates marked as outliers.
     In this case, an 'outlier' is more than z standard deviations above or below the mean.
     (In general, these intensity distributions seem to be strongly right-tailed...)
     """
+#    nums = data.flatten().astype(int) #astype(int) 
+#    mean = statistics.mean(data.flatten())
+#    std = statistics.stdev(data.flatten())    
+#    #std = statistics.stdev(data.flatten(), xbar = mean)
+    mean,std = data.mean(), data.std()
     
-    mean = statistics.mean(data)
-    std = statistics.stdev(data, xbar = mean)
     
-    
-    low,high = mean-z*std, mean+z*std
+    low,high = mean - z*std, mean + z*std
     
     valid_mask = np.ndarray(data.shape, dtype = bool)
     valid_mask.fill(True) #most will not be outliers
@@ -59,15 +60,38 @@ def make_validity_mask(data, z = 2.8):
     
     return valid_mask, outliers
 
+#def get_outliers(data):
+#    """
+#    Input: a NumPy array, corresponding to the intensity of its respective image.
+#    Returns: a list of those coordinates marked as outliers.
+#    In this case, an 'outlier' is above the 99.5th percentile.
+#    """
+#    indexer = np.ndindex(data)
+#    num_tups = [] #will be L value, then original coordinate
+#    
+#    for i in indexer:
+#        num_tups.append((data[i], i))
+#    
+#    num_tups = sorted(num_tups, key = lambda x: x[0]) #sort by luminance
+#    
+#    decile = 0.995
+#    cutoff = int(decile*len(num_tups))
+#    
+#    outliers = [c[1] for c in num_tups[cutoff:]]
+#    
+#    return outliers
+#    
+    
 
 
-def remove_outliers(data, outlier_coords):
+
+def remove_coords(data, coords):
     """
     Removes from the dictionary of coord-->namedtuple (data) the coordinates contained in outlier_coords. Done in-place.
     """
     
-    for c in outlier_coords:
-        data.pop(c)
+    for c in coords:
+        data.pop(c, None) #returns None instead of KeyError if already removed
 
 
 def remove_background(data):
@@ -75,12 +99,16 @@ def remove_background(data):
     Removes data corresponding to the background of the image (histology slice).
     A coordinate is considered part of the background if its associated coherence and energy is less than or equal to g.EPSILON.
     Operation performed in-place.
+    Returns coordinates of what was considered background.
     """
-    
+    popped = []
     for k in data:
         if data[k].coherence <= g.EPSILON and data[k].energy <= g.EPSILON:
-            data.pop(k)
+            popped.append(k)
+    for p in popped:
+        data.pop(k, None) #returns None if already not in data
 
+    return popped
 
 
 def get_image(im_flag):
@@ -144,7 +172,7 @@ def get_aniso_data():
     
     for i in data_index: 
         c_info = g.coord_info(coord=tuple(reversed(i)), orientation=oris[i], coherence=cohs[i], energy=eners[i])
-        tupled_data[i] = np.array(c_info)
+        tupled_data[i] = c_info#np.array(c_info)
         
     # TODO: combine pixels together to improve signal-to-noise ratio?
             
@@ -298,7 +326,7 @@ def set_up_outputs():
     return im_names
 
 
-def map_marked_pixels(outpath, coords, image_shape):
+def map_marked_pixels(outpath, coords, image_shape, fname):
     """
     Maps pixels marked by collect_coords_of_interest onto an otherwise white background.
     """
@@ -312,7 +340,7 @@ def map_marked_pixels(outpath, coords, image_shape):
     im = Image.fromarray(im_data.astype('uint8'))
     im.convert('1')
     
-    fpath = os.path.join(outpath, 'dye_marked_pixels.png')
+    fpath = os.path.join(outpath, fname)
     #fpath = '{0}/{1}'.format(outpath, 'dye_marked_pixels.png')
     im.save(fpath)
     #im.show() #debugging
@@ -338,9 +366,14 @@ def get_coords(data, data_mask, predicate, quant_flag = g.LOW):
 #        if data_mask[i]: #if not removed
     
     #find mean and std of remaining values
-    oris, cohs, eners = [c.orientation for c in data.values], [c.coherence for c in data.values], [c.energy for c in data.values]
-    means = g.coord_info(orientation=s.mean(oris), coherence = s.mean(cohs), energy = s.mean(eners))
-    stds = g.coord_info(orientation=s.stdev(oris, xbar = means.orientation), coherence = s.stdev(cohs, xbar = means.coherence), energy = s.stdev(eners, xbar = means.energy))
+    vals = ([c.orientation for c in data.values()], [c.coherence for c in data.values()], [c.energy for c in data.values()])
+    labels = ('orientation', 'coherence', 'energy')
+    means = {l:s.mean(v) for l,v in zip(labels,vals)}
+    stds = {l:s.stdev(v) for l,v in zip(labels, vals)}
+    #means = {'orientation': s.mean(oris), 'coherence': s.mean(cohs), 'energy':s.mean(eners)}
+    #means = g.coord_info(orientation=s.mean(oris), coherence = s.mean(cohs), energy = s.mean(eners))
+    #stds = {}
+    #stds = g.coord_info(orientation=s.stdev(oris, xbar = means.orientation), coherence = s.stdev(cohs, xbar = means.coherence), energy = s.stdev(eners, xbar = means.energy))
     
     coords = []
     
@@ -364,7 +397,7 @@ def get_coords(data, data_mask, predicate, quant_flag = g.LOW):
         anisos_sorted = sorted(data.values(), key = weighted_anisotropy)        
         indices = (np.multiply(quants, len(anisos_sorted))).astype(int)
         
-        coords = [x.coord for x in anisos_sorted[indices.min():indices.max()]]
+        coords = [tuple(reversed(x.coord)) for x in anisos_sorted[indices.min():indices.max()]] #flip back from x.coord (pixel location) to coord (as it would appear as the corresponding element in a NumPy array)
         
         # slow but most thorough
 #        cohs_sorted = sorted(data.values(), key = lambda x: x.coherence)
@@ -395,11 +428,13 @@ def has_high_aniso(aniso_tuple, means, stds, z_bounds = (1.5,2.5)):
     Returns whether the tuple has low anisotropy, characterized by high energy and high coherency.
     Also passed in: means and standard deviations for orientation, coherence, energy.
     """
-    adict,mdict,sdict = aniso_tuple._asdict(), means._asdict(), stds._asdict() #maybe I can get around having to use a _'d method...
+    adict = aniso_tuple._asdict()
+    #adict,mdict,sdict = aniso_tuple._asdict(), means._asdict(), stds._asdict() #maybe I can get around having to use a _'d method...
     for k in adict:
         if k == 'coord' or k == 'orientation':
             continue #don't care about these for now
-        if not falls_in_zrange(adict[k], mdict[k], sdict[k], z_bounds):
+        if not falls_in_zrange(adict[k], means[k], stds[k], z_bounds):
+        #if not falls_in_zrange(adict[k], mdict[k], sdict[k], z_bounds):
             return False
     #if got here, falls in proper range for all cases
     return True
