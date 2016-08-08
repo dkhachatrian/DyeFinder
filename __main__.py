@@ -10,6 +10,7 @@ from lib import helpers as h
 from lib import globe as g
 import numpy as np
 import os
+import subprocess
 #from collections import namedtuple
 
 
@@ -28,6 +29,14 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
     for dep_im_fname in dep_im_fnames:
         if g.ANISO_LABEL in dep_im_fname:
             aniso_fname, aniso_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+            
+            # generate the Text Images if not already created
+            im_path = os.path.join(g.dep, rel_path, aniso_fname)
+            
+            if "batched.txt" not in os.listdir(os.path.join(g.dep,rel_path)):        
+                args = ['java', '-jar', 'ij.jar', '-batch', 'aniso macro', im_path]
+                    # will require aniso_macro.ijm to be installed as a macro in fiji
+                subprocess.run(args)
         elif g.NSC_LABEL in dep_im_fname:
             dye_fname, dye_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
 
