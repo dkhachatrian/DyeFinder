@@ -19,6 +19,9 @@ label2val = {x:i for i,x in enumerate(coord_labels)} #choose things by name
 
 coord_info = namedtuple('coord_info', coord_labels)
 
+ANISO_LABEL = 'aniso' #in filename, for DiI stain
+NSC_LABEL = 'nsc' #in filename, for brown stain
+
 
 
 out_dir = os.path.join(dname, 'outputs') #directory for output files
@@ -43,6 +46,7 @@ MAX = 255 #8-bit
 
 DYE_IM = 1
 ANISO_IM = 2
+BATCH = 3
 
 
 LOW = 'l'

@@ -14,6 +14,7 @@ import numpy as np
 from matplotlib import colors
 
 from matplotlib import pyplot as plt
+plt.ioff() #ensure no windows are opened while running the script
 
 import pickle
 import os
@@ -111,10 +112,19 @@ def remove_background(data):
     return popped
 
 
-def get_image(im_flag):
+def get_image(im_flag, fpath = None):
     """
     Prompts user for name of image, looking in the dependencies directory.
+    Returns the filename, and a PIL.Image of the associated file.
+    
+    If im_flag is set to g.BATCH, opens the image found at fpath.
     """
+
+    if im_flag == g.BATCH:
+        im = Image.open(os.path.join(g.dep, fpath))
+        file_name = os.path.basename(fpath)
+        return file_name, im
+    
     while True:
         try:
             if im_flag == g.ANISO_IM:
@@ -136,30 +146,45 @@ def get_image(im_flag):
     return file_name, im
     
     
-def get_aniso_data():
+def get_aniso_data(flag = None, relpath = None):
     """
     Prompts user for names of files corresponding to outputs of OrientationJ's parameters: orientation, coherence, and energy.
     Input files are searched for in the script's dependencies folder.
     Input files must haev been saved as a Text Image using ImageJ.
     
     Returns a dict of array coordinate-->coord_info (a namedtuple)
+    
+    If flag is set to g.BATCH, will look in relpath (relative to ./dependencies/) to find appropriate .txt files to construct the dictionary.
     """
 
     data_names = ['orientation', 'coherence', 'energy']
     fnames = []
     data_list = []
     
-    while len(fnames) < len(data_names):
-        try:
-            file_name = input("Please state the name of the file corresponding to the " + str(data_names[len(data_list)]) + " for the image of interest (saved as a Text Image from ImageJ), or enter nothing to quit: \n")
-            with open(os.path.join(g.dep, file_name), 'r') as inf:
-                d_layer = np.loadtxt(inf, delimiter = '\t')
-            fnames.append(file_name)
-            data_list.append(d_layer)
-        except FileNotFoundError:
-            print('File not found! Please ensure the name was spelled correctly and is in the dependencies directory.')
-        except ValueError:
-            print('File structure not recognized! Please ensure the file was spelled correctly and was saved as a Text Image in ImageJ.')
+    if flag == g.BATCH:
+        fdir = os.path.join(g.dep, relpath)
+        for fname in os.listdir(fdir):
+            if '.txt' in fname and data_names[len(data_list)] in fname:
+                with open(os.path.join(fdir, fname), 'r') as inf:
+                    d_layer = np.loadtxt(inf, delimiter = '\t')
+                fnames.append(fname)
+                data_list.append(d_layer)
+        if len(data_list) != len(data_names):
+            raise HelperException("Not enough in .txt files found in {0} when running h.get_aniso_data in batch mode!".format(relpath))
+    
+    #else    
+    else:
+        while len(fnames) < len(data_names):
+            try:
+                file_name = input("Please state the name of the file corresponding to the " + str(data_names[len(data_list)]) + " for the image of interest (saved as a Text Image from ImageJ), or enter nothing to quit: \n")
+                with open(os.path.join(g.dep, file_name), 'r') as inf:
+                    d_layer = np.loadtxt(inf, delimiter = '\t')
+                fnames.append(file_name)
+                data_list.append(d_layer)
+            except FileNotFoundError:
+                print('File not found! Please ensure the name was spelled correctly and is in the dependencies directory.')
+            except ValueError:
+                print('File structure not recognized! Please ensure the file was spelled correctly and was saved as a Text Image in ImageJ.')
     
     #TODO: clean up this implementation...
     
@@ -250,14 +275,18 @@ def collect_coords_of_interest(image, color = 'brown'):
     return coords
 
 
-def plot_histogram_data(data, coords, fname, title, predicate, bins = 100, drange=(0,1)):
+def plot_histogram_data(data, coords, outdir, fname, title, predicate, bins = 100, drange=(0,1)):
     """
     Bin datapoints corresponding to coordinates from a list (coords) to the data, according to a predicate function (predicate).
     The predicate function takes in a coord_info namedtuple, and outputs a value to be used to build the histogram.
     plot_histogram_data returns the output of plt.hist()
-    Also saves figure to 'outputs' directory.
+    Also saves figure to outdir with name fname.
     """
     #TODO: use numpy.histogram2d or numpy.histogramdd instead of plt.hist    
+    
+    # clear old information so no overlap between successive calls
+    plt.cla()
+    plt.clf()    
     
     pred_data = []
     
@@ -274,12 +303,13 @@ def plot_histogram_data(data, coords, fname, title, predicate, bins = 100, drang
     plt.title(title)
     #plt.show()
     
-    hist_path = os.path.join(g.out_dir, fname)
+    hist_path = os.path.join(outdir, fname)
     # TODO: provide labels to graph...
 #    plt.show()
     plt.savefig(hist_path)
 #    with open(hist_path, 'w') as inf:
 #    
+
     
     return hist_data
     #return (hist, bin_edges)
@@ -306,10 +336,12 @@ def save_to_cache(var, info):
 def set_up_outputs():
     """
     For batch running of images in 'dependencies', set up directories in the 'outputs' folder.
-    Returns the path to the image, relative to '/dependencies/'
+    Returns the paths to the image, relative to '/dependencies/'
+    More specifically, returns a list of directories relative to './dependencies/', and a list of list of files found in the same directory.
     """
-    im_names = []
+    rel_paths, im_names_ll = [], []
     for root, dirs, files in os.walk(g.dep, topdown = True):
+        im_names = []
         if len(files) > 0:
             #see if there are .tif's (images to be processed) in the root dirctory
             for f in files:
@@ -320,15 +352,16 @@ def set_up_outputs():
                         os.makedirs(os.path.join(g.out_dir, rel_path))
                     except os.error:
                         pass #already exists
-                    
+                    rel_paths.append(rel_path)
                     im_names.append(os.path.join(rel_path, f)) #remember filepath
+        im_names_ll.append(im_names)
         
-    return im_names
+    return rel_paths, im_names_ll
 
 
 def map_marked_pixels(outpath, coords, image_shape, fname):
     """
-    Maps pixels marked by collect_coords_of_interest onto an otherwise white background.
+    Maps pixels marked by collect_coords_of_interest as black onto an otherwise white background.
     """
     #im = Image.new('L', image_shape)
     im_data = np.ndarray(tuple(reversed(image_shape))) #ensure shape matches im...
