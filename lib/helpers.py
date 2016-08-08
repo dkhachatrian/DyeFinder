@@ -28,7 +28,7 @@ class HelperException(Exception):
 
 
 
-def make_validity_mask(data, z = 3):
+def make_validity_mask(data, z = 4):
     """
     Input: a NumPy array, corresponding to the intensity of its respective image.
     Returns: a NumPy of type bool, with shape data.shape, where elements marked 'False' were deemed outliers and are to be ignored when performing further analysis. Also returns a list of those coordinates marked as outliers.

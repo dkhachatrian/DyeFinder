@@ -24,19 +24,21 @@ dep_ims = h.set_up_outputs() #also runs ImageJ macros to get OrientationJ measur
 dye_fname, dye_im = h.get_image(g.DYE_IM)
 im_data_shape = tuple(reversed(dye_im.size))
 
+f_prefix = dye_fname
+
 #color_of_interest = h.get_color_of_interest()
 color_of_interest = 'brown'
 
 coords_of_interest = h.collect_coords_of_interest(dye_im, color_of_interest)
 
-
+Z = 4
 
 #anisotropy...
 
 aniso_data = h.get_aniso_data() #for anisotropy data
 aniso_fname, aniso_im = h.get_image(g.ANISO_IM)
 
-validity_mask, outlier_coords = h.make_validity_mask(np.array(aniso_im.convert('L')))
+validity_mask, outlier_coords = h.make_validity_mask(np.array(aniso_im.convert('L')), z = Z)
 
 
 # for when using quantile method of getting outliers...
@@ -95,9 +97,9 @@ for coords, coords_name in zip(coords_list, coord_names):
 #h.save_to_cache(pixels_of_interest, pixels_info)
 
 
-h.map_marked_pixels(outpath = g.out_dir, coords = coords_of_interest, image_shape = dye_im.size, fname = 'dye_marked_pixels.png')
-h.map_marked_pixels(outpath = g.out_dir, coords = bg_coords, image_shape = dye_im.size, fname = 'bg_pixels.png') #debugging
-h.map_marked_pixels(outpath = g.out_dir, coords = outlier_coords, image_shape = dye_im.size, fname = 'outlier_pixels.png') #debugging
+h.map_marked_pixels(outpath = g.out_dir, coords = coords_of_interest, image_shape = dye_im.size, fname = '{0} dye_marked_pixels.png'.format(f_prefix))
+h.map_marked_pixels(outpath = g.out_dir, coords = bg_coords, image_shape = dye_im.size, fname = '{0} bg_pixels.png'.format(f_prefix)) #debugging
+h.map_marked_pixels(outpath = g.out_dir, coords = outlier_coords, image_shape = dye_im.size, fname = '{0} outlier_pixels z={1}.png'.format(f_prefix, Z)) #debugging
 
 # TODO: update outpath when batching is implemented
 
