@@ -16,7 +16,7 @@ import subprocess
 
 np.set_printoptions(precision = 3)
 
-imagej_loc = h.getImageJLocation()
+imagej_loc = h.get_ImageJ_location()
 ij_macro_loc = os.path.join(g.lib, 'aniso_macro.ijm')
 macro_label = 'macro_performed_list.txt'
 
