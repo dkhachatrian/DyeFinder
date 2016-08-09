@@ -28,6 +28,38 @@ class HelperException(Exception):
     pass
 
 
+def prompt_user_to_set_up_files():
+    """
+    Gives user time to set up files before the script continues.
+    """
+    while True:
+        print("Hello! Please set up the dependencies folder with the folder structure desired in the output directory.")
+        print("Paired images (i.e., an NSC-stained image and its adjacent slice) should be saved with the same prefix and be saved with either '{0}.tif' or '{1}.tif' at the end, depending on whether it is the NSC-stained or membrane-stained slices, respectively".format(g.NSC_LABEL, g.ANISO_LABEL))
+        print("Type 'q' to quit. Otherwise, press Enter when the files are set up as desired.")
+        uin = input()
+        if uin == 'q':
+            sys.exit()
+        else:
+            return
+
+
+def get_ImageJ_location():
+    """
+    Get absolute path to an instance of ImageJ, with OrientationJ installed.
+    Does not perform rigorous testing of whether you in fact pointed to a valid copy of ImageJ -- just checks that the user pointed to a file.
+    """
+    print("Hello! Please ensure your copy of ImageJ has the OrientationJ plugin installed.")
+    while True:
+        uinput = input("Please input the absolute path to your ImageJ executable, with directories separated by slashes ('/'):\n")
+        parts = uinput.split('/')
+        ijpath = os.path.join(*parts)
+        if os.path.isfile(ijpath):
+            return ijpath
+        else:
+            print("File not found! Please ensure you separated the path directories with slashes ('/').")
+            
+
+
 
 def make_validity_mask(data, z = 4):
     """

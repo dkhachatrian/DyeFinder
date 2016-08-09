@@ -8,6 +8,7 @@ import os
 abspath = os.path.abspath(__file__) #in lib directory
 dname = os.path.dirname(os.path.dirname(abspath)) #twice to get path to main directory
 dep = os.path.join(dname, 'dependencies')
+lib = os.path.join(dname, 'lib')
 os.chdir(dname)
 ####
 
