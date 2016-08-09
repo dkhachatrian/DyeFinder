@@ -11,7 +11,8 @@ SENTINEL_FILE = "batched.txt"
 
 function perform_orientation_analysis(fpath)
 {
-	setBatchMode(true);
+	
+setBatchMode(true);
 	open(fpath);
 	fname = File.getName(fpath)
 	parent = File.getParent(fpath)
@@ -25,13 +26,13 @@ function perform_orientation_analysis(fpath)
 
 	//save all images as Text Images, then close
 	selectWindow("Coherency-1");
-	saveAs("Text Image", fpath + " " + "c.txt");
+	saveAs("Text Image", fpath + " " + "coherence.txt");
 	close();
 	selectWindow("Orientation-1");
-	saveAs("Text Image", fpath + " " + "o.txt");
+	saveAs("Text Image", fpath + " " + "orientation.txt");
 	close();
 	selectWindow("Energy-1");
-	saveAs("Text Image", fpath + " " + "e.txt");
+	saveAs("Text Image", fpath + " " + "energy.txt");
 	close();
 	selectWindow(fname);
 	close();
@@ -40,7 +41,8 @@ function perform_orientation_analysis(fpath)
 	//run("Close"); 
 
 	// leave a file to note that the batch worked on this directory
-	File.saveString(".txt files were created by aniso_macro.ijm", parent + SENTINEL_FILE)  
+
+	File.saveString(".txt files were created by aniso_macro.ijm", parent + SENTINEL_FILE)  
 }
 
 perform_orientation_analysis(path);

@@ -14,9 +14,14 @@ import subprocess
 #from collections import namedtuple
 
 
+from sys import platform as _platform
+
+#from lib import hist_plotter #not ever directly called, but changes to pyplot are necessary
+
+
 np.set_printoptions(precision = 3)
 
-imagej_loc = h.get_ImageJ_location()
+imagej_loc = h.get_ImageJ_location(_platform)
 ij_macro_loc = os.path.join(g.lib, 'aniso_macro.ijm')
 macro_label = 'macro_performed_list.txt'
 
@@ -29,41 +34,52 @@ rel_paths, dep_ims_fname_ll = h.set_up_outputs()
 #run ImageJ macros to get OrientationJ measures (?)
 
 for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
-    print("Working on files in {0}...".format(os.path.join(g.dep,rel_path)))
+    if rel_path == '.': #same as trunk
+        rel_path = ''
+        
+    print("Now working on files in {0}...".format(os.path.join(g.dep,rel_path)))
+    
+    if len(dep_im_fnames) == 0: # no images to process
+        continue    
+    
+    
     out_dir = os.path.join(g.out_dir, rel_path)    
+
     
     for dep_im_fname in dep_im_fnames:
-        if g.ANISO_LABEL in dep_im_fname:
-            aniso_fname, aniso_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+        if dep_im_fname.endswith('.tif'):
+            if g.ANISO_LABEL in dep_im_fname:
+                aniso_fname, aniso_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+                
+                # generate the Text Images if not already created
+                im_path = os.path.join(g.dep, rel_path, aniso_fname)
+                
+                #check to see if the file's been processed
+             #   if macro_label not in os.listdir(os.path.join(g.dep,rel_path)): 
+                    # 'a+' allows for appending and reading, creates file if non-existent
+                with open(os.path.join(g.dep,rel_path,macro_label), mode = 'a+') as inf:
+                    found = False
+                    for line in inf:
+                        stripped = line.strip('\n')
+                        if stripped == im_path:
+                            found = True
+                            break
+                if not found:
+                #if macro_label not in os.listdir(os.path.join(g.dep,rel_path)):        
+                    sub_args = [imagej_loc, '--headless', '-macro', ij_macro_loc, im_path]
+    #                args = ['java', '-jar', 'ij.jar', '-batch', 'aniso macro', im_path]
+    #                    # will require aniso_macro.ijm to be installed as a macro in fiji
+                    subprocess.run(sub_args, check = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+                    #suppressing output...
+                    #will throw subprocess.CalledProcessError exception if the subprocess fails for some reason...
+                    #but if not, hopefully that means the macro also worked correctly
+                    #so let's mark that it ran here on a specific file
+                    with open(os.path.join(g.dep,rel_path,macro_label), 'a+') as inf:
+                        inf.write('{0}\n'.format(im_path))
             
-            # generate the Text Images if not already created
-            im_path = os.path.join(g.dep, rel_path, aniso_fname)
-            
-            #check to see if the file's been processed
-         #   if macro_label not in os.listdir(os.path.join(g.dep,rel_path)): 
-                # 'a+' allows for appending and reading, creates file if non-existent
-            with open(os.path.join(g.dep,rel_path,macro_label), mode = 'a+') as inf:
-                found = False
-                for line in inf:
-                    stripped = line.strip('\n')
-                    if stripped == im_path:
-                        found = True
-                        break
-            if not found:
-            #if macro_label not in os.listdir(os.path.join(g.dep,rel_path)):        
-                args = [imagej_loc, '--headless', '-macro', ij_macro_loc, im_path]
-#                args = ['java', '-jar', 'ij.jar', '-batch', 'aniso macro', im_path]
-#                    # will require aniso_macro.ijm to be installed as a macro in fiji
-                subprocess.run(args, check = True) #will throw subprocess.CalledProcessError exception if the subprocess fails for some reason...
-                #but if not, hopefully that means the macro also worked correctly
-                #so let's mark that it ran here on a specific file
-                with open(os.path.join(g.dep,rel_path,macro_label), 'a+') as inf:
-                    inf.write('{0}\n'.format(im_path))
-            
-            
-        elif g.NSC_LABEL in dep_im_fname:
-            dye_fname, dye_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
-
+                
+            elif g.NSC_LABEL in dep_im_fname:
+                dye_fname, dye_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
 
 
 

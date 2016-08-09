@@ -43,30 +43,60 @@ def prompt_user_to_set_up_files():
             return
 
 
-def get_ImageJ_location():
+def get_ImageJ_location(platform):
     """
-    Get absolute path to an instance of ImageJ, with OrientationJ installed.
+    Get absolute path to an instance of Fiji, with OrientationJ installed.
     Does not perform rigorous testing of whether you in fact pointed to a valid copy of ImageJ -- just checks that the user pointed to a file.
     """
     print("Hello! Please ensure your copy of ImageJ has the OrientationJ plugin installed.")
-    while True:
-        uinput = input("Please input the absolute path to your ImageJ executable, with directories separated by either only slashes ('/') or only backslashes ('\\'):\n")
-        #first split
-        parts = uinput.split('/')
-        if len(parts) == 1:
-            parts = uinput.split('\\')
-                
-        #'manually' add in os.sep after drive letter (containing a ':')
-        # otherwise, drive letter is not followed by os.sep
-        # when using os.sep.join
-        parts = [''.join([p, os.sep]) if ':' in p else p for p in parts]
-        ijpath = os.path.join(*parts)
-        #now re-split and os.path.join()
-        #otherwise, drive letter is not followed by os.sep
-        if os.path.isfile(ijpath):
-            return ijpath
-        else:
-            print("File not found! Please ensure you separated the path directories with slashes ('/').")
+    if platform == 'win32': #windows
+        while True:
+            uinput = input("Please input the absolute path to your ImageJ executable, with directories separated by either only slashes ('/') or only backslashes ('\\'):\n")
+            #first split
+            parts = uinput.split('/')
+            if len(parts) == 1:
+                parts = uinput.split('\\')
+                    
+
+#            ijpath = os.sep.join(parts)
+#            #because for some reason, os.path.join is silly about drive letters            
+            
+            
+            #'manually' add in os.sep after drive letter (containing a ':')
+            # otherwise, drive letter is not followed by os.sep
+            # when using os.sep.join
+            parts = [''.join([p, os.sep]) if ':' in p else p for p in parts]
+            ijpath = os.path.join(*parts)
+            #now re-split and os.path.join()
+            #otherwise, drive letter is not followed by os.sep
+            if os.path.isfile(ijpath):
+                return ijpath
+            else:
+                print("File not found! Please ensure you separated the path directories with slashes ('/').")
+    
+    if platform == 'darwin': #mac osx
+        relpath = os.path.join('Contents','MacOS', 'ImageJ-macosx') #from Fiji.app to actual executable
+        while True:
+            print("Please input the directory of the Fiji package, separated by slashes ('/').")
+            print("Type 'q' and press Enter to quit.")
+            print("Press Enter without typing anything to check the default location of '/Applications/Fiji.app':")
+            uinput = input("Type your response now:\n")
+            
+            if uinput == '':
+                uinput = '/Applications/Fiji.app'
+            
+            parts = uinput.split('/')
+            
+            
+            
+            # manually feed back in the first os.sep,
+            # as the '' in parts is disregarded by os.path.join
+            ijpath = os.sep + os.path.join(*parts, relpath)
+            
+            if os.path.isfile(ijpath):
+                return ijpath
+            else:
+                print("File not found! Please ensure you separated the path directories with slashes ('/').")
             
 
 
@@ -198,31 +228,50 @@ def get_aniso_data(flag = None, relpath = None):
     
     If flag is set to g.BATCH, will look in relpath (relative to ./dependencies/) to find appropriate .txt files to construct the dictionary.
     """
-
     data_names = ['orientation', 'coherence', 'energy']
-    fnames = []
-    data_list = []
+    EXPECTED_LENGTH = len(data_names)
+    #fnames = []
     
     if flag == g.BATCH:
+        data_list = {}
         fdir = os.path.join(g.dep, relpath)
-        for fname in os.listdir(fdir):
-            if '.txt' in fname and data_names[len(data_list)] in fname:
-                with open(os.path.join(fdir, fname), 'r') as inf:
-                    d_layer = np.loadtxt(inf, delimiter = '\t')
-                fnames.append(fname)
-                data_list.append(d_layer)
-        if len(data_list) != len(data_names):
+        #changing = True #will keep track of whether len(data_list) changes
+        
+        for fname in filter(lambda x: x.endswith('.txt'), os.listdir(fdir)):
+            for label in data_names:
+                if label in fname:
+                    with open(os.path.join(fdir, fname), 'r') as inf:
+                        d_layer = np.loadtxt(inf, delimiter = '\t')
+                    #fnames.append(fname)
+                    data_list[label] = d_layer
+                    data_names.remove(label)
+                    break
+        
+#        while changing:
+#            if len(data_list) == len(data_names):
+#                break
+#            changing = False
+#            for fname in os.listdir(fdir):
+#                if fname.endswith('.txt') and data_names[len(data_list)] in fname:
+#                    changing = True
+#                    with open(os.path.join(fdir, fname), 'r') as inf:
+#                        d_layer = np.loadtxt(inf, delimiter = '\t')
+#                    fnames.append(fname)
+#                    data_list.append(d_layer)
+#                    break
+        if len(data_list) != EXPECTED_LENGTH:
             raise HelperException("Not enough in .txt files found in {0} when running h.get_aniso_data in batch mode!".format(relpath))
     
     #else    
     else:
-        while len(fnames) < len(data_names):
+        data_list = {}
+        while len(data_list) < EXPECTED_LENGTH:
             try:
                 file_name = input("Please state the name of the file corresponding to the " + str(data_names[len(data_list)]) + " for the image of interest (saved as a Text Image from ImageJ), or enter nothing to quit: \n")
                 with open(os.path.join(g.dep, file_name), 'r') as inf:
                     d_layer = np.loadtxt(inf, delimiter = '\t')
-                fnames.append(file_name)
-                data_list.append(d_layer)
+                #fnames.append(file_name)
+                data_list[data_names[len(data_list)]] = d_layer
             except FileNotFoundError:
                 print('File not found! Please ensure the name was spelled correctly and is in the dependencies directory.')
             except ValueError:
@@ -230,12 +279,12 @@ def get_aniso_data(flag = None, relpath = None):
     
     #TODO: clean up this implementation...
     
-    data_shape = data_list[0].shape
+    data_shape = data_list['orientation'].shape
     data_index = np.ndindex(data_shape)
     tupled_data = {} #dictionary of data_array_coordinate s --> coord_infos    
     #tupled_data = np.ndarray(data_shape).tolist()
     
-    oris, cohs, eners = data_list
+    oris, cohs, eners = data_list['orientation'], data_list['coherence'], data_list['energy']
     
     for i in data_index: 
         c_info = g.coord_info(coord=tuple(reversed(i)), orientation=oris[i], coherence=cohs[i], energy=eners[i])
@@ -326,6 +375,8 @@ def plot_histogram_data(data, coords, outdir, fname, title, predicate, bins = 10
     """
     #TODO: use numpy.histogram2d or numpy.histogramdd instead of plt.hist    
     
+    #from lib import hist_plotter    
+    
     # clear old information so no overlap between successive calls
     plt.cla()
     plt.clf()    
@@ -375,27 +426,29 @@ def save_to_cache(var, info):
         pickle.dump(var, outf, pickle.HIGHEST_PROTOCOL)
     
 
-def set_up_outputs():
+def set_up_outputs(main_root = g.dep):
     """
     For batch running of images in 'dependencies', set up directories in the 'outputs' folder.
     Returns the paths to the image, relative to '/dependencies/'
     More specifically, returns a list of directories relative to './dependencies/', and a list of list of files found in the same directory.
     """
     rel_paths, im_names_ll = [], []
-    for root, dirs, files in os.walk(g.dep, topdown = True):
+    for root, dirs, files in os.walk(main_root, topdown = True):
+        rel_path = os.path.relpath(root, main_root) #relative path from main_root to directory containing dirs and files
         im_names = []
         if len(files) > 0:
             #see if there are .tif's (images to be processed) in the root dirctory
             for f in files:
-                if '.tif' in f:
+                if f.endswith('.tif'):
                     #make dir for each directory containing tifs, in outputs
-                    rel_path = os.path.relpath(root, g.dep)
                     try:
                         os.makedirs(os.path.join(g.out_dir, rel_path))
                     except os.error:
                         pass #already exists
-                    rel_paths.append(rel_path)
-                    im_names.append(os.path.join(rel_path, f)) #remember filepath
+                    im_names.append(f) #remember filenames found
+                    
+        #add to lists. Even if empty (so unzipping works as expected)
+        rel_paths.append(rel_path)
         im_names_ll.append(im_names)
         
     return rel_paths, im_names_ll

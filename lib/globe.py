@@ -21,7 +21,7 @@ label2val = {x:i for i,x in enumerate(coord_labels)} #choose things by name
 coord_info = namedtuple('coord_info', coord_labels)
 
 ANISO_LABEL = 'aniso' #in filename, for DiI stain
-NSC_LABEL = 'nsc' #in filename, for brown stain
+NSC_LABEL = 'nsc_locs' #in filename, for brown stain
 
 
 
