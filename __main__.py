@@ -44,18 +44,21 @@ rel_paths, dep_ims_fname_ll = h.set_up_outputs()
 for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
 #    if rel_path == '.': #same as trunk
 #        rel_path = ''
-        
-    print("Now working on files in {0}...".format(os.path.join(g.dep,rel_path)))
-    
+
     if len(dep_im_fnames) == 0: # no images to process
         continue    
+
+    print() #two newline spaces between directories
+    print("Now working on files in {0}...".format(os.path.join(g.dep,rel_path)))
+    
+
     
     
     
     
     out_dir = os.path.join(g.out_dir, rel_path)    
     
-    macro_path = os.path.join(g.dep,rel_path,macro_label)
+    macro_path = os.path.join(g.cache_dir,rel_path,macro_label)
     
     #create macro list if necessary
     try:
@@ -71,8 +74,10 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
         for name2 in dep_im_fnames:
             if name1 == name2:
                 continue
-            if name1.split(' ')[0] == name2.split(' ')[0]:
-                paired_image_names_ll.append([name1,name2])
+            paired = sorted([name1,name2]) #ensures same order --> can prevent duplicates
+            if name1.split(g.PREFIX_SEPARATOR)[0] == name2.split(g.PREFIX_SEPARATOR)[0] and paired not in paired_image_names_ll:
+                paired_image_names_ll.append(paired)
+                
 #            
 #    end = time.clock()
 #    print("Pairing image names took {0} seconds for a directory with {1} images.".format(end-start, len(dep_im_fnames)))
@@ -80,6 +85,13 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
     
     
     for paired_image_list in paired_image_names_ll:
+        
+        print('Working on paired images: {0}...'.format(paired_image_list))
+        
+        #time each pair
+        start_total = time.clock()
+        
+        
         for dep_im_fname in paired_image_list:
             if dep_im_fname.endswith('.tif'):
                 if g.ANISO_LABEL in dep_im_fname:
@@ -105,6 +117,7 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
         #                args = ['java', '-jar', 'ij.jar', '-batch', 'aniso macro', im_path]
         #                    # will require aniso_macro.ijm to be installed as a macro in fiji
                         subprocess.run(sub_args, check = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+                        #creates the txt files
                         #suppressing output...
                         #will throw subprocess.CalledProcessError exception if the subprocess fails for some reason...
                         #but if not, hopefully that means the macro also worked correctly
@@ -116,128 +129,133 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
                 elif g.NSC_LABEL in dep_im_fname:
                     dye_fname, dye_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
 
-
-
-    im_data_shape = tuple(reversed(dye_im.size))
-    
-    f_prefix = dye_fname
     
     
-    Z = 4
-    
-    #anisotropy...
-    
-    start = time.clock()
-    aniso_data = h.get_aniso_data(flag = g.BATCH, relpath = rel_path) #for anisotropy data
-    #aniso_fname, aniso_im = h.get_image(g.ANISO_IM)
-    end = time.clock()
-    print("get_aniso_data took {0} seconds for an image with {1} pixels.".format(end-start, reduce(lambda x,y: x*y, im_data_shape)))
-    
-    
-    validity_mask, outlier_coords = h.make_validity_mask(np.array(aniso_im.convert('L')), z = Z)
-    
-    
-    # for when using quantile method of getting outliers...
-    #validity_mask = None  #filler
-    #outlier_coords = h.get_outliers(np.array(aniso_im.convert('L')))
-    
-    h.remove_coords(data = aniso_data, coords = outlier_coords)
-    bg_coords = h.remove_background(data = aniso_data)
-    ignore_coords = bg_coords + outlier_coords
-    
-    
-    #color_of_interest = h.get_color_of_interest()
-    color_of_interest = 'brown'
-    
-    
-    
-    #coords_of_interest = h.collect_coords_of_interest(dye_im, color = color_of_interest)
-    
-    start = time.clock()
-    coords_of_interest = h.collect_coords_of_interest(dye_im, ignore_list = ignore_coords, color = color_of_interest)
-    end = time.clock()
-    print("coords_of_interest pruning took {0} seconds for an image with {1} coordinates in the ignore_list.".format(end-start, len(ignore_coords)))
-#    before_cleaning = len(coords_of_interest)    
-#    
-#    start = time.clock()
-#    for oc in outlier_coords:
-#        try:
-#            coords_of_interest.remove(oc)
-#        except ValueError:
-#            pass
-#    for bc in bg_coords:
-#        try:
-#            coords_of_interest.remove(bc)
-#        except ValueError:
-#            pass
-#    #coords_of_interest = [c for c in coords_of_interest if c not in outlier_coords and c not in bg_coords]
-#    end = time.clock()
-#    print("coords_of_interest pruning took {0} seconds for an image with {1} original coordinates, {2} outlier coordinates, and {3} background coordinates. The operation removed {4} coordinates from coords_of_interest.".format(end-start, before_cleaning, len(outlier_coords), len(bg_coords), before_cleaning - len(coords_of_interest))
-    
-    
-#    # TODO: Slow. Speed up?
-#    start = time.clock()
-#    high_aniso_coords, method_high = h.get_coords(aniso_data, data_mask = validity_mask, predicate = h.has_high_aniso) #eg, in this case, white matter
-#    end = time.clock()
-#    print("Getting high_aniso_coords took {0} seconds and ended up using method_high={1}.".format(end-start, method_high))
-#    
-#    start = time.clock()
-#    low_aniso_coords, method_low = h.get_coords(aniso_data, data_mask = validity_mask, predicate = h.has_low_aniso) #eg, in this case, gray matter
-#    end = time.clock()
-#    print("Getting high_aniso_coords took {0} seconds and ended up using method_high={1}.".format(end-start, method_low))
-#    
-    
-    high_aniso_coords, method_high = [], 'debugging'
-    low_aniso_coords, method_low = [], 'debugging'
-    
-    #remove now
-    
-    
-    hist_ftype = 'PNG'
-    
-    
-    #naming histograms...
-    coords_list = [coords_of_interest, high_aniso_coords, low_aniso_coords, aniso_data.keys()]
-    coord_names = ['dye_coords', 'high_aniso_coords method={0}'.format(method_high), 'low_aniso_coords method={0}'.format(method_low), 'all_coords_(no_bg_or_artifacts)']
-    
-    #clean coords in coords_list of any outlier or background coordinates...
-    
-    
-    
-    for coords, coords_name in zip(coords_list, coord_names):
-        n_bins = 100 #can be sequence if dimension_number>1
-        hist_info = [dye_fname, color_of_interest, coords_name, len(coords), hist_ftype]
-        #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename
-        title_p = "for specified group: {0}".format(coords_name)
-        h.plot_histogram_data(data = aniso_data, coords = coords, outdir = out_dir, info = hist_info, title_postfix = title_p, predicates = aniso_measures, bins = n_bins)
-    
-    
-    ## Coordinates of Interest
-    #hist_info = 'dye_fname={0} color_of_interest_(HSV)={1} coords_of_interest histogram.{2}'.format(dye_fname, color_of_interest, hist_ftype)
-    #hist_title = 'E*C for within specified color threshold.'
-    #h.plot_histogram_data(aniso_data, coords = coords_of_interest, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
-    
-    
-    ## All non-artifact/non-background coordinates
-    #
-    #hist_info = 'dye_fname={0} all_coordinates histogram.{1}'.format(dye_fname, hist_ftype)
-    #if not os.path.exists(os.path.join(g.cache_dir, hist_info)):
-    #    hist_title = 'E*C for entire image.'
-    #    indexer = np.ndindex(im_data_shape)
-    #    h.plot_histogram_data(aniso_data, coords = indexer, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
+        im_data_shape = tuple(reversed(dye_im.size))
+        
+        f_prefix = dye_fname
+        
+        
+        Z = 4
+        
+        #anisotropy...
+        
+        start = time.clock()
+        aniso_data = h.get_aniso_data(flag = g.BATCH, relpath = rel_path) #for anisotropy data
+        #aniso_fname, aniso_im = h.get_image(g.ANISO_IM)
+        end = time.clock()
+        print("get_aniso_data took {0} seconds for an image with {1} pixels.".format(end-start, reduce(lambda x,y: x*y, im_data_shape)))
+        
+        
+        validity_mask, outlier_coords = h.make_validity_mask(np.array(aniso_im.convert('L')), z = Z)
+        
+        
+        # for when using quantile method of getting outliers...
+        #validity_mask = None  #filler
+        #outlier_coords = h.get_outliers(np.array(aniso_im.convert('L')))
+        
+        h.remove_coords(data = aniso_data, coords = outlier_coords)
+        bg_coords = h.remove_background(data = aniso_data)
+        ignore_coords = bg_coords + outlier_coords
+        
+        
+        #color_of_interest = h.get_color_of_interest()
+        color_of_interest = 'brown'
+        
+        
+        
+        #coords_of_interest = h.collect_coords_of_interest(dye_im, color = color_of_interest)
+        
+        start = time.clock()
+        coords_of_interest = h.collect_coords_of_interest(dye_im, ignore_list = ignore_coords, color = color_of_interest)
+        end = time.clock()
+        print("coords_of_interest pruning took {0} seconds for an image with {1} coordinates in the ignore_list.".format(end-start, len(ignore_coords)))
+    #    before_cleaning = len(coords_of_interest)    
     #    
-    
-    
-    
-    #pixels_of_interest = [tuple(reversed(i)) for i in coords_of_interest] #reversed to match (x,y)
-    #pixels_info = 'dye_fname={0} color_of_interest_(HSV)={1} pixels_of_interest.p'.format(dye_fname,color_of_interest)
-    #h.save_to_cache(pixels_of_interest, pixels_info)
-    
-    
-    h.map_marked_pixels(outpath = out_dir, coords = coords_of_interest, image_shape = dye_im.size, fname = '{0} dye_marked_pixels.png'.format(f_prefix))
-    h.map_marked_pixels(outpath = out_dir, coords = bg_coords, image_shape = dye_im.size, fname = '{0} bg_pixels.png'.format(f_prefix)) #debugging
-    h.map_marked_pixels(outpath = out_dir, coords = outlier_coords, image_shape = dye_im.size, fname = '{0} outlier_pixels z={1}.png'.format(f_prefix, Z)) #debugging
-    
-    # TODO: update outpath when batching is implemented
+    #    start = time.clock()
+    #    for oc in outlier_coords:
+    #        try:
+    #            coords_of_interest.remove(oc)
+    #        except ValueError:
+    #            pass
+    #    for bc in bg_coords:
+    #        try:
+    #            coords_of_interest.remove(bc)
+    #        except ValueError:
+    #            pass
+    #    #coords_of_interest = [c for c in coords_of_interest if c not in outlier_coords and c not in bg_coords]
+    #    end = time.clock()
+    #    print("coords_of_interest pruning took {0} seconds for an image with {1} original coordinates, {2} outlier coordinates, and {3} background coordinates. The operation removed {4} coordinates from coords_of_interest.".format(end-start, before_cleaning, len(outlier_coords), len(bg_coords), before_cleaning - len(coords_of_interest))
+        
+        
+    #    # TODO: Slow. Speed up?
+    #    start = time.clock()
+    #    high_aniso_coords, method_high = h.get_coords(aniso_data, data_mask = validity_mask, predicate = h.has_high_aniso) #eg, in this case, white matter
+    #    end = time.clock()
+    #    print("Getting high_aniso_coords took {0} seconds and ended up using method_high={1}.".format(end-start, method_high))
+    #    
+    #    start = time.clock()
+    #    low_aniso_coords, method_low = h.get_coords(aniso_data, data_mask = validity_mask, predicate = h.has_low_aniso) #eg, in this case, gray matter
+    #    end = time.clock()
+    #    print("Getting high_aniso_coords took {0} seconds and ended up using method_high={1}.".format(end-start, method_low))
+    #    
+        
+        high_aniso_coords, method_high = [], 'debugging'
+        low_aniso_coords, method_low = [], 'debugging'
+        
+        #remove now
+        
+        
+        hist_ftype = 'PNG'
+        
+        
+        #naming histograms...
+        coords_list = [coords_of_interest, high_aniso_coords, low_aniso_coords, aniso_data.keys()]
+        coord_names = ['dye_coords', 'high_aniso_coords method={0}'.format(method_high), 'low_aniso_coords method={0}'.format(method_low), 'all_coords_(no_bg_or_artifacts)']
+        
+        #clean coords in coords_list of any outlier or background coordinates...
+        
+        
+        
+        for coords, coords_name in zip(coords_list, coord_names):
+            n_bins = 100 #can be sequence if dimension_number>1
+            hist_info = [dye_fname, color_of_interest, coords_name, len(coords), hist_ftype]
+            #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename
+            title_p = "for specified group: {0}".format(coords_name)
+            h.plot_histogram_data(data = aniso_data, coords = coords, outdir = out_dir, info = hist_info, title_postfix = title_p, predicates = aniso_measures, bins = n_bins)
+        
+        
+        ## Coordinates of Interest
+        #hist_info = 'dye_fname={0} color_of_interest_(HSV)={1} coords_of_interest histogram.{2}'.format(dye_fname, color_of_interest, hist_ftype)
+        #hist_title = 'E*C for within specified color threshold.'
+        #h.plot_histogram_data(aniso_data, coords = coords_of_interest, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
+        
+        
+        ## All non-artifact/non-background coordinates
+        #
+        #hist_info = 'dye_fname={0} all_coordinates histogram.{1}'.format(dye_fname, hist_ftype)
+        #if not os.path.exists(os.path.join(g.cache_dir, hist_info)):
+        #    hist_title = 'E*C for entire image.'
+        #    indexer = np.ndindex(im_data_shape)
+        #    h.plot_histogram_data(aniso_data, coords = indexer, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
+        #    
+        
+        
+        
+        #pixels_of_interest = [tuple(reversed(i)) for i in coords_of_interest] #reversed to match (x,y)
+        #pixels_info = 'dye_fname={0} color_of_interest_(HSV)={1} pixels_of_interest.p'.format(dye_fname,color_of_interest)
+        #h.save_to_cache(pixels_of_interest, pixels_info)
+        
+        
+        h.map_marked_pixels(outpath = out_dir, coords = coords_of_interest, image_shape = dye_im.size, fname = '{0} dye_marked_pixels.png'.format(f_prefix))
+        h.map_marked_pixels(outpath = out_dir, coords = bg_coords, image_shape = dye_im.size, fname = '{0} bg_pixels.png'.format(f_prefix)) #debugging
+        h.map_marked_pixels(outpath = out_dir, coords = outlier_coords, image_shape = dye_im.size, fname = '{0} outlier_pixels z={1}.png'.format(f_prefix, Z)) #debugging
+        
+        # TODO: update outpath when batching is implemented
+        
+        end_total = time.clock()
+        
+        print("It took {0} seconds to perform the operations on the paired image list {1}.".format(end_total-start_total, paired_image_list))
+        print() #one newline space between paired image lists
 
 print('Done!')

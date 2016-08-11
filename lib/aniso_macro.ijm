@@ -42,7 +42,7 @@ setBatchMode(true);
 
 	// leave a file to note that the batch worked on this directory
 
-	File.saveString(".txt files were created by aniso_macro.ijm", parent + SENTINEL_FILE)  
+	//File.saveString(".txt files were created by aniso_macro.ijm", parent + SENTINEL_FILE)  
 }
 
 perform_orientation_analysis(path);

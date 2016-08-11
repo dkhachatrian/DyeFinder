@@ -36,6 +36,8 @@ def prompt_user_to_set_up_files():
     while True:
         print("Hello! Please set up the dependencies folder with the folder structure desired in the output directory.")
         print("Paired images (i.e., an NSC-stained image and its adjacent slice) should be saved with the same prefix and be saved with either '{0}.tif' or '{1}.tif' at the end, depending on whether it is the NSC-stained or membrane-stained slices, respectively.".format(g.NSC_LABEL, g.ANISO_LABEL))
+        print("The paired images should have the same filename prefix, separated from the rest of the filename with a '{0}'".format(g.PREFIX_SEPARATOR))
+        print("Currently, the image filenames cannot have parenthesis in them. (This breaks all ImageJ macros, as of version 1.51e.)")
         print("Type 'q' to quit. Otherwise, press Enter when the files are set up as desired:")
         uin = input()
         if uin == 'q':
@@ -238,7 +240,7 @@ def get_aniso_data(flag = None, relpath = None):
         fdir = os.path.join(g.dep, relpath)
         #changing = True #will keep track of whether len(data_list) changes
         
-        for fname in filter(lambda x: x.endswith('.txt'), os.listdir(fdir)):
+        for fname in [x for x in os.listdir(fdir) if x.endswith('.txt')]:
             for label in data_names:
                 if label in fname:
                     with open(os.path.join(fdir, fname), 'r') as inf:
@@ -299,32 +301,32 @@ def get_aniso_data(flag = None, relpath = None):
     
     
     
-    
-def get_color_of_interest():
-    """
-    Prompt user for RGB value of color of interest.
-    Returns an HSV tuple with values in range [0,1].
-    """
-    
-    print('Please open your image in ImageJ and point your cursor to a pixel whose color is representative of the stain of interest.')
-    
-    while True:
-        try:
-            tup = input("Please type the RGB tuple corresponding to the pixel of interest. There should be three numbers, separated by commas, with values falling within [0,255]:\n")
-            tup.strip('() ')
-            c_rgb = [int(x)/g.MAX for x in tup.split(',')]
-            if len(c_rgb) != 3:
-                print('Error! Not enough numbers entered. Please try again.')
-                continue
-            elif min(c_rgb) < 0 or max(c_rgb) > 1:
-                print('Error! Numbers does not fall within the expected range of [0,255]. Please try again.')
-                continue
-            break
-        except ValueError:
-            print('Error! Numbers not entered. Please try again.')
-            continue
-    
-    return tuple(colors.rgb_to_hsv(c_rgb))
+#    
+#def get_color_of_interest():
+#    """
+#    Prompt user for RGB value of color of interest.
+#    Returns an HSV tuple with values in range [0,1].
+#    """
+#    
+#    print('Please open your image in ImageJ and point your cursor to a pixel whose color is representative of the stain of interest.')
+#    
+#    while True:
+#        try:
+#            tup = input("Please type the RGB tuple corresponding to the pixel of interest. There should be three numbers, separated by commas, with values falling within [0,255]:\n")
+#            tup.strip('() ')
+#            c_rgb = [int(x)/g.MAX for x in tup.split(',')]
+#            if len(c_rgb) != 3:
+#                print('Error! Not enough numbers entered. Please try again.')
+#                continue
+#            elif min(c_rgb) < 0 or max(c_rgb) > 1:
+#                print('Error! Numbers does not fall within the expected range of [0,255]. Please try again.')
+#                continue
+#            break
+#        except ValueError:
+#            print('Error! Numbers not entered. Please try again.')
+#            continue
+#    
+#    return tuple(colors.rgb_to_hsv(c_rgb))
 
 
 
@@ -433,6 +435,7 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
     # maybe look into http://stackoverflow.com/questions/27156381/python-creating-a-2d-histogram-from-a-numpy-matrix
     
  
+    fig, ax = plt.subplots()
     
     plt.cla()
     plt.clf()
@@ -445,7 +448,7 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
         vals_ll.append(vals)
         labels.append(label)
     
-    title_prefix = 'Histogram of'
+    title_prefix = 'Histogram'
 #    title_info = ' and '.join(labels)
 #    title = ' '.join((title_prefix, title_info, title_postfix))
     
@@ -469,11 +472,10 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
 #        plt.ylabel(labels[1])
 #    
 #
-    fname = "dye_imagename={0} color_of_interest={1} {2} (n={3}) vals={6} histogram (bins={5}).{4}".format(*info, bins, labels)
+    fname = "{0} color_of_interest={1} {2} (n={3}) vals={6} histogram (bins={5}).{4}".format(*info, bins, labels)
     
     
     H, edges = np.histogramdd(vals_ll, bins = bins, normed = True)
-    fig, ax = plt.subplots()
     
     if len(edges) == 1: #1d histogram
         #redoing the binning, but it's worked in the past...
@@ -503,6 +505,8 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
         
     ax.set_title(title)    
     plt.savefig(os.path.join(outdir,fname))
+    plt.close(fig) # remove figure from memory
+        # because apparently garbage collection isn't a thing with plt/mpl...
     #return (H,edges)
 
 
@@ -559,11 +563,19 @@ def set_up_outputs(main_root = g.dep, ftypes = g.IMAGE_FILETYPES, ignore_list = 
             for f in files:
                 for ftype in ftypes:
                     if f.endswith(ftype):
-                        #make dir for each directory containing tifs, in outputs
+                        #make dir for each directory containing tifs
+                        #outputs
                         try:
                             os.makedirs(os.path.join(g.out_dir, rel_path))
                         except os.error:
                             pass #already exists
+                        
+                        #cached files (e.g., .txt's)
+                        try:
+                            os.makedirs(os.path.join(g.cache_dir, rel_path))
+                        except os.error:
+                            pass #already exists
+                        
                         im_names.append(f) #remember filenames found
                         break #check next file
                     

@@ -31,6 +31,9 @@ IMAGE_FILETYPES = ['.tif']
 IGNORE_LIST = ['__ignore__']
 
 
+PREFIX_SEPARATOR = ' '
+
+
 
 out_dir = os.path.join(dname, 'outputs') #directory for output files
 
