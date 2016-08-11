@@ -435,7 +435,7 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
     # maybe look into http://stackoverflow.com/questions/27156381/python-creating-a-2d-histogram-from-a-numpy-matrix
     
  
-    fig, ax = plt.subplots()
+    from matplotlib.colors import LogNorm
     
     plt.cla()
     plt.clf()
@@ -479,8 +479,10 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
     
     if len(edges) == 1: #1d histogram
         #redoing the binning, but it's worked in the past...
+        fig, ax = plt.subplots()
         ax.hist(vals_ll, bins = bins, normed = True)
         ax.set_xlabel(labels[0])
+        ax.set_title(title)
         
 #        #already binned, so just put onto pyplot and save
 #        # adapted from http://stackoverflow.com/questions/12303501/python-plot-simple-histogram-given-binned-data
@@ -488,24 +490,37 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
 #        plt.bar(left = np.arange(*drange, dx), height = H)
 #        plt.xlabel(labels[0])
     
-    elif len(edges) == 2: #2d histogram
-        # adapted from http://matplotlib.org/examples/pylab_examples/colorbar_tick_labelling_demo.html   
-        edges = list(reversed(edges)) #flip to have it be (x,y)
-        #fig, ax = plt.subplots()
-        cax = ax.imshow(H, interpolation='nearest', cmap=cm.coolwarm, extent = [edges[0][0],edges[0][-1],edges[1][0],edges[1][1]])
-
-        # Add colorbar, make sure to specify tick locations to match desired ticklabels
-        cbar = fig.colorbar(cax, ticks=[0, 0.5, 1])
-        cbar.ax.set_yticklabels(['0', '0.5', '1'])  # vertically oriented colorbar
+#    elif len(edges) == 2: #2d histogram
+#        # adapted from http://matplotlib.org/examples/pylab_examples/colorbar_tick_labelling_demo.html   
+#        edges = list(reversed(edges)) #flip to have it be (x,y)
+#        #fig, ax = plt.subplots()
+#        cax = ax.imshow(H, interpolation='nearest', cmap=cm.coolwarm)
+#        #cax = ax.imshow(H, interpolation='nearest', cmap=cm.coolwarm, extent = [edges[0][0],edges[0][-1],edges[1][0],edges[1][1]])
+#
+#        # Add colorbar, make sure to specify tick locations to match desired ticklabels
+#        cbar = fig.colorbar(cax, ticks=[0, 0.5, 1])
+#        cbar.ax.set_yticklabels(['0', '0.5', '1'])  # vertically oriented colorbar
+#        
+#        # labels
+#        
+#        ax.set_xlabel(labels[0])
+#        ax.set_ylabel(labels[1])
+    
+    
+    elif len(edges) == 2:
+        # adapted from http://matplotlib.org/examples/pylab_examples/hist2d_log_demo.html
+        plt.hist2d(vals_ll[0], vals_ll[1], bins = [bins,bins], normed = True)
+        # plt.hist2d(vals_ll[0], vals_ll[1], bins = [bins,bins], normed = LogNorm())
+        # plt.hist2d(vals_ll[0], vals_ll[1], bins=bins, normed=True)
+        plt.colorbar()
+        plt.xlabel(labels[0])
+        plt.ylabel(labels[1])
+        plt.title(title)
         
-        # labels
-        
-        ax.set_xlabel(labels[0])
-        ax.set_ylabel(labels[1])
-        
-    ax.set_title(title)    
+     
     plt.savefig(os.path.join(outdir,fname))
-    plt.close(fig) # remove figure from memory
+    plt.close('all')
+    #plt.close(fig) # remove figure from memory
         # because apparently garbage collection isn't a thing with plt/mpl...
     #return (H,edges)
 

@@ -32,9 +32,11 @@ h.prompt_user_to_set_up_files()
 
 #aniso_measures = h.choose_measures()
 
-aniso_measures = [a.weighted_anisotropy] #1d
-#aniso_measures = [a.coherence, a.energy] #2d
+#aniso_measures = [a.weighted_anisotropy] #1d
+aniso_measures = [a.coherence, a.energy] #2d
 
+# remove_outliers = h.should_remove_outliers()
+remove_outliers = False
 
 rel_paths, dep_ims_fname_ll = h.set_up_outputs()
 
@@ -148,13 +150,15 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
         
         
         validity_mask, outlier_coords = h.make_validity_mask(np.array(aniso_im.convert('L')), z = Z)
+#        outlier_coords = []
         
         
         # for when using quantile method of getting outliers...
         #validity_mask = None  #filler
         #outlier_coords = h.get_outliers(np.array(aniso_im.convert('L')))
-        
-        h.remove_coords(data = aniso_data, coords = outlier_coords)
+        if remove_outliers:
+            h.remove_coords(data = aniso_data, coords = outlier_coords)
+            
         bg_coords = h.remove_background(data = aniso_data)
         ignore_coords = bg_coords + outlier_coords
         

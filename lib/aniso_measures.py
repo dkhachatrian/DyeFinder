@@ -45,7 +45,7 @@ def coherence(data, coords):
     Also returns descriptor string.
     """
     label = 'coherence values'
-    vals = {}
+    vals = []
     for c in coords:
         vals.append(data[c].coherence)
     
@@ -58,7 +58,7 @@ def energy(data, coords):
     Also returns descriptor string.
     """
     label = 'energy values'
-    vals = {}
+    vals = []
     for c in coords:
         vals.append(data[c].energy)
     
