@@ -12,8 +12,9 @@ import sys
 from PIL import Image
 import numpy as np
 from matplotlib import colors
+from matplotlib import cm
 
-from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
 plt.ioff() #ensure no windows are opened while running the script
 
 import pickle
@@ -329,10 +330,11 @@ def get_color_of_interest():
 
 
 
-def collect_coords_of_interest(image, color = 'brown'):
+def collect_coords_of_interest(image, ignore_list = None, color = 'brown'):
     """
     Collect coordinates in the image that is close to color (HSV tuple).
     Coords will be in data_array order, *not* in image (x,y) order.
+    Coords will not contain any elements of ignore_list
     Returns the coordinates as a list.
     """
     
@@ -341,11 +343,24 @@ def collect_coords_of_interest(image, color = 'brown'):
     im_data = np.array(im) # [0,255]    
     #im_data = np.array(im) / MAX
     
+    
     index = np.ndindex(im_data.shape[:-1]) #loop over (x,y(,z)) but not data itself
+
+    im_data_dict = {i:im_data[i] for i in index}
+    
+    # remove unwanted coordinates
+    for k in ignore_list:
+        try:
+            im_data_dict.pop(k)
+        except KeyError:
+            pass
+    
     hsv_thresh = g.color2hsv_thresh[color]
     coords = []
     
-    for i in index:
+    for i in im_data_dict:
+#        if i in ignore_list:  #skip
+#            continue
         match = True
         for band, thresh in zip(im_data[i], hsv_thresh):
             if band < min(thresh) or band > max(thresh):
@@ -366,54 +381,129 @@ def collect_coords_of_interest(image, color = 'brown'):
     return coords
 
 
-def plot_histogram_data(data, coords, outdir, fname, title, predicate, bins = 100, drange=(0,1)):
+#def plot_histogram_data(data, coords, outdir, fname, title, predicate, bins = 100, drange=(0,1)):
+#    """
+#    Bin datapoints corresponding to coordinates from a list (coords) to the data, according to a predicate function (predicate).
+#    The predicate function takes in a coord_info namedtuple, and outputs a value to be used to build the histogram.
+#    plot_histogram_data returns the output of plt.hist()
+#    Also saves figure to outdir with name fname.
+#    """
+#    #TODO: use numpy.histogram2d or numpy.histogramdd instead of plt.hist    
+#    
+#    #from lib import hist_plotter    
+#    
+#    # clear old information so no overlap between successive calls
+#    plt.cla()
+#    plt.clf()    
+#    
+#    pred_data = []
+#    
+#    for c in coords:
+#        pred_data.append(predicate(data[c]))
+#    
+#    # plot histogram using np.histogram so it doesn't force a new window to pop up
+#    hist_data = plt.hist(pred_data, bins, range=drange)
+##    hist, bin_edges = np.histogram(pred_data, bins, range=drange)
+##    plt.bar(bin_edges[:-1], hist, width = 1)
+##    plt.xlim(*drange)    
+##    #plt.xlim(min(bin_edges), max(bin_edges))
+#
+#    plt.title(title)
+#    #plt.show()
+#    
+#    hist_path = os.path.join(outdir, fname)
+#    # TODO: provide labels to graph...
+##    plt.show()
+#    plt.savefig(hist_path)
+##    with open(hist_path, 'w') as inf:
+##    
+#
+#    
+#    return hist_data
+#    #return (hist, bin_edges)
+#    
+    
+def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, bins = 100, drange=(0,1)):
     """
     Bin datapoints corresponding to coordinates from a list (coords) to the data, according to a predicate function (predicate).
     The predicate function takes in a coord_info namedtuple, and outputs a value to be used to build the histogram.
     plot_histogram_data returns the output of plt.hist()
     Also saves figure to outdir with name fname.
     """
-    #TODO: use numpy.histogram2d or numpy.histogramdd instead of plt.hist    
+    # maybe look into http://stackoverflow.com/questions/27156381/python-creating-a-2d-histogram-from-a-numpy-matrix
     
-    #from lib import hist_plotter    
+ 
     
-    # clear old information so no overlap between successive calls
     plt.cla()
-    plt.clf()    
+    plt.clf()
     
-    pred_data = []
+    vals_ll = []
+    labels = [] #for good titling
     
-    for c in coords:
-        pred_data.append(predicate(data[c]))
+    for pred in predicates:
+        vals, label = pred(data,coords)
+        vals_ll.append(vals)
+        labels.append(label)
     
-    # plot histogram using np.histogram so it doesn't force a new window to pop up
-    hist_data = plt.hist(pred_data, bins, range=drange)
-#    hist, bin_edges = np.histogram(pred_data, bins, range=drange)
-#    plt.bar(bin_edges[:-1], hist, width = 1)
-#    plt.xlim(*drange)    
-#    #plt.xlim(min(bin_edges), max(bin_edges))
-
-    plt.title(title)
-    #plt.show()
+    title_prefix = 'Histogram of'
+#    title_info = ' and '.join(labels)
+#    title = ' '.join((title_prefix, title_info, title_postfix))
     
-    hist_path = os.path.join(outdir, fname)
-    # TODO: provide labels to graph...
-#    plt.show()
-    plt.savefig(hist_path)
-#    with open(hist_path, 'w') as inf:
+    title = ' '.join([title_prefix, title_postfix])
+    
+    labels = list(reversed(labels)) #difference between array-like and image-like    
 #    
+#    if len(predicates) == 2: #2d histogram
+#        H, xedges, yedges = np.histogram2d(vals[0], vals[1], bins = bins, normed = True)
+#        im = plt.imshow(H, interpolation='nearest', origin='low', \
+#                extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]])
+#    
+#    
+#    #gives a bin density when normed == True    
+#    H, edges = np.histogramdd(vals_ll, bins = bins, normed = True)
+#
+#    fig = plt.figure()
+#    fig.suptitle(title)
+#    plt.xlabel(labels[0])
+#    if len(predicates) == 2:
+#        plt.ylabel(labels[1])
+#    
+#
+    fname = "dye_imagename={0} color_of_interest={1} {2} (n={3}) vals={6} histogram (bins={5}).{4}".format(*info, bins, labels)
+    
+    
+    H, edges = np.histogramdd(vals_ll, bins = bins, normed = True)
+    fig, ax = plt.subplots()
+    
+    if len(edges) == 1: #1d histogram
+        #redoing the binning, but it's worked in the past...
+        ax.hist(vals_ll, bins = bins, normed = True)
+        ax.set_xlabel(labels[0])
+        
+#        #already binned, so just put onto pyplot and save
+#        # adapted from http://stackoverflow.com/questions/12303501/python-plot-simple-histogram-given-binned-data
+#        dx = (max(drange)-min(drange)/edges[0].size)
+#        plt.bar(left = np.arange(*drange, dx), height = H)
+#        plt.xlabel(labels[0])
+    
+    elif len(edges) == 2: #2d histogram
+        # adapted from http://matplotlib.org/examples/pylab_examples/colorbar_tick_labelling_demo.html   
+        edges = list(reversed(edges)) #flip to have it be (x,y)
+        #fig, ax = plt.subplots()
+        cax = ax.imshow(H, interpolation='nearest', cmap=cm.coolwarm, extent = [edges[0][0],edges[0][-1],edges[1][0],edges[1][1]])
 
-    
-    return hist_data
-    #return (hist, bin_edges)
-    
-    
-def weighted_anisotropy(aniso_tuple):
-    """
-    Returns a coherence-weighted energy value.
-    """
-    return aniso_tuple[g.label2val['coherence']] * aniso_tuple[g.label2val['energy']]
-
+        # Add colorbar, make sure to specify tick locations to match desired ticklabels
+        cbar = fig.colorbar(cax, ticks=[0, 0.5, 1])
+        cbar.ax.set_yticklabels(['0', '0.5', '1'])  # vertically oriented colorbar
+        
+        # labels
+        
+        ax.set_xlabel(labels[0])
+        ax.set_ylabel(labels[1])
+        
+    ax.set_title(title)    
+    plt.savefig(os.path.join(outdir,fname))
+    #return (H,edges)
 
 
 def save_to_cache(var, info):
@@ -426,26 +516,56 @@ def save_to_cache(var, info):
         pickle.dump(var, outf, pickle.HIGHEST_PROTOCOL)
     
 
-def set_up_outputs(main_root = g.dep):
+def set_up_outputs(main_root = g.dep, ftypes = g.IMAGE_FILETYPES, ignore_list = g.IGNORE_LIST):
     """
     For batch running of images in 'dependencies', set up directories in the 'outputs' folder.
     Returns the paths to the image, relative to '/dependencies/'
     More specifically, returns a list of directories relative to './dependencies/', and a list of list of files found in the same directory.
+    Ignores files located in directories labeled '__ignore__'
     """
+    
+    # TODO: pair up images in lists here to ensure no mixup in rest of script,
+    # when there is more than one set of images in one directory    
+    
     rel_paths, im_names_ll = [], []
+    
+    #im_names_lll = []
+    
+    #im_names_lll will hold all im_names_ll
+    #im_names_ll will hold pairs of images with the same beginning filename
+    
+
+    
     for root, dirs, files in os.walk(main_root, topdown = True):
         rel_path = os.path.relpath(root, main_root) #relative path from main_root to directory containing dirs and files
         im_names = []
+        
+        #remove values in ignore_list from dirs
+        for i in ignore_list:
+            try:
+                dirs.remove(i)
+            except ValueError: #not in list
+                pass
+            
+            
+        #dirs = list(filter(lambda x: x not in ignore_list, dirs))
+        #removes directories with the same name as any string in ignore_list 
+        
+#        if '__ignore__' in dirs:
+#            dirs.remove('__ignore__')
+        
         if len(files) > 0:
             #see if there are .tif's (images to be processed) in the root dirctory
             for f in files:
-                if f.endswith('.tif'):
-                    #make dir for each directory containing tifs, in outputs
-                    try:
-                        os.makedirs(os.path.join(g.out_dir, rel_path))
-                    except os.error:
-                        pass #already exists
-                    im_names.append(f) #remember filenames found
+                for ftype in ftypes:
+                    if f.endswith(ftype):
+                        #make dir for each directory containing tifs, in outputs
+                        try:
+                            os.makedirs(os.path.join(g.out_dir, rel_path))
+                        except os.error:
+                            pass #already exists
+                        im_names.append(f) #remember filenames found
+                        break #check next file
                     
         #add to lists. Even if empty (so unzipping works as expected)
         rel_paths.append(rel_path)
@@ -522,7 +642,7 @@ def get_coords(data, data_mask, predicate, quant_flag = g.LOW):
             quants = (0.75, 0.85)
         
         #faster, by multiplying values of interest
-        anisos_sorted = sorted(data.values(), key = weighted_anisotropy)        
+        anisos_sorted = sorted(data.values(), key = predicate)        
         indices = (np.multiply(quants, len(anisos_sorted))).astype(int)
         
         coords = [tuple(reversed(x.coord)) for x in anisos_sorted[indices.min():indices.max()]] #flip back from x.coord (pixel location) to coord (as it would appear as the corresponding element in a NumPy array)

@@ -24,10 +24,20 @@ ANISO_LABEL = 'aniso' #in filename, for DiI stain
 NSC_LABEL = 'nsc_locs' #in filename, for brown stain
 
 
+IMAGE_FILETYPES = ['.tif']
+
+#directories with labels in this list will be ignored
+# by h.set_up_outputs()
+IGNORE_LIST = ['__ignore__']
+
+
 
 out_dir = os.path.join(dname, 'outputs') #directory for output files
 
 cache_dir = os.path.join(dname, 'cache')
+
+ignore_dir = os.path.join(dep, '__ignore__')
+
 
 # create directories if necessary
 
@@ -36,11 +46,22 @@ if not os.path.isdir(out_dir):
 
 if not os.path.isdir(cache_dir):
     os.mkdir(cache_dir)
+
+if not os.path.isdir(dep):
+    os.mkdir(dep)
+    
+if not os.path.isdir(ignore_dir):
+    os.mkdir(ignore_dir)
     
 
 EPSILON = 0.01 #for use in removing background
 
-color2hsv_thresh = { 'brown': [(9,23),(63,209),(0,196)] } #
+
+# used in h.get_coords_of_interest() to get pixels with a specific color
+# HSV tuple bounds should be obtained manually once, then added here
+# with order color_name-->[H_bounds,S_bounds,V_bounds]
+color2hsv_thresh = { 'brown': [(9,23),(63,209),(0,196)] } 
+
 
 #EPSILON = 0.05 #for RGB tuple values, providing a range of color to count as interesting
 MAX = 255 #8-bit
