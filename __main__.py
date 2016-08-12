@@ -28,6 +28,11 @@ imagej_loc = h.get_ImageJ_location(_platform)
 ij_macro_loc = os.path.join(g.lib, 'aniso_macro.ijm')
 macro_label = 'macro_performed_list.txt'
 
+oj_labels = ['coherence.txt', 'orientation.txt', 'energy.txt']
+#postfix of txt's produced by ImageJ macro. Joined with filename by ' '
+# NOT LINKED WITH MACRO. If macro changes, the above needs to change.
+# 
+
 h.prompt_user_to_set_up_files()
 
 #aniso_measures = h.choose_measures()
@@ -38,12 +43,12 @@ aniso_measures = [a.coherence, a.energy] #2d
 # remove_outliers = h.should_remove_outliers()
 remove_outliers = False
 
-rel_paths, dep_ims_fname_ll = h.set_up_outputs()
+rel_paths, dep_ims_fname_ll, dep_roi_infos = h.parse_dependencies()
 
 
 #run ImageJ macros to get OrientationJ measures (?)
 
-for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
+for rel_path, dep_im_fnames, related_info_fnames in zip(rel_paths, dep_ims_fname_ll, dep_roi_infos):
 #    if rel_path == '.': #same as trunk
 #        rel_path = ''
 
@@ -53,9 +58,12 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
     print() #two newline spaces between directories
     print("Now working on files in {0}...".format(os.path.join(g.dep,rel_path)))
     
+    info_ll = []
 
-    
-    
+    for f in related_info_fnames:
+        info_path = os.path.join(g.dep, rel_path, f)
+        info_ll.append(h.get_roi_info(info_path))
+        #white_matter, gray_matter, injection_site = h.get_roi_info(info_path)
     
     
     out_dir = os.path.join(g.out_dir, rel_path)    
@@ -71,14 +79,14 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
 
 #    start = time.clock()
     # check if they have the same beginning. split with ' '
-    paired_image_names_ll = [] #list of two-element lists
-    for name1 in dep_im_fnames:
-        for name2 in dep_im_fnames:
-            if name1 == name2:
-                continue
-            paired = sorted([name1,name2]) #ensures same order --> can prevent duplicates
-            if name1.split(g.PREFIX_SEPARATOR)[0] == name2.split(g.PREFIX_SEPARATOR)[0] and paired not in paired_image_names_ll:
-                paired_image_names_ll.append(paired)
+#    paired_image_names_ll = [] #list of two-element lists
+#    for name1 in dep_im_fnames:
+#        for name2 in dep_im_fnames:
+#            if name1 == name2:
+#                continue
+#            paired = sorted([name1,name2]) #ensures same order --> can prevent duplicates
+#            if name1.split(g.PREFIX_SEPARATOR)[0] == name2.split(g.PREFIX_SEPARATOR)[0] and paired not in paired_image_names_ll:
+#                paired_image_names_ll.append(paired)
                 
 #            
 #    end = time.clock()
@@ -86,7 +94,7 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
             
     
     
-    for paired_image_list in paired_image_names_ll:
+    for paired_image_list in dep_im_fnames:
         
         print('Working on paired images: {0}...'.format(paired_image_list))
         
@@ -95,41 +103,48 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
         
         
         for dep_im_fname in paired_image_list:
-            if dep_im_fname.endswith('.tif'):
-                if g.ANISO_LABEL in dep_im_fname:
-                    aniso_fname, aniso_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
-                    
-                    # generate the Text Images if not already created
-                    im_path = os.path.join(g.dep, rel_path, aniso_fname)
-                    
-                    #check to see if the file's been processed
-                 #   if macro_label not in os.listdir(os.path.join(g.dep,rel_path)): 
-                    # 'a+' allows for appending and reading, *creating file if non-existent*
-                    with open(macro_path, mode = 'r+') as inf:
-                        #inf.seek(0) #go to beginning of file
-                        found = False
-                        for line in inf:
-                            stripped = line.strip('\n')
-                            if stripped == im_path:
-                                found = True
-                                break
-                    if not found:
-                    #if macro_label not in os.listdir(os.path.join(g.dep,rel_path)):        
-                        sub_args = [imagej_loc, '--headless', '-macro', ij_macro_loc, im_path]
-        #                args = ['java', '-jar', 'ij.jar', '-batch', 'aniso macro', im_path]
-        #                    # will require aniso_macro.ijm to be installed as a macro in fiji
-                        subprocess.run(sub_args, check = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
-                        #creates the txt files
-                        #suppressing output...
-                        #will throw subprocess.CalledProcessError exception if the subprocess fails for some reason...
-                        #but if not, hopefully that means the macro also worked correctly
-                        #so let's mark that it ran here on a specific file
-                        with open(macro_path, 'a+') as inf:
-                            inf.write('{0}\n'.format(im_path))
+            #if dep_im_fname.endswith('.tif'):
+            if g.ANISO_LABEL in dep_im_fname:
+                aniso_fname, aniso_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
                 
+                # generate the Text Images if not already created
+                im_path = os.path.join(g.dep, rel_path, aniso_fname)
+                
+                #check to see if the file's been processed
+             #   if macro_label not in os.listdir(os.path.join(g.dep,rel_path)): 
+                # 'a+' allows for appending and reading, *creating file if non-existent*
+                with open(macro_path, mode = 'r+') as inf:
+                    #inf.seek(0) #go to beginning of file
+                    found = False
+                    for line in inf:
+                        stripped = line.strip('\n')
+                        if stripped == im_path:
+                            found = True
+                            break
+                if not found:
+                #if macro_label not in os.listdir(os.path.join(g.dep,rel_path)):        
+                    sub_args = [imagej_loc, '--headless', '-macro', ij_macro_loc, im_path]
+    #                args = ['java', '-jar', 'ij.jar', '-batch', 'aniso macro', im_path]
+    #                    # will require aniso_macro.ijm to be installed as a macro in fiji
+                    subprocess.run(sub_args, check = True, stdout = subprocess.DEVNULL, stderr = subprocess.DEVNULL)
+                    #creates the txt files
+                    #suppressing output...
+                    #will throw subprocess.CalledProcessError exception if the subprocess fails for some reason...
+                    #but if not, hopefully that means the macro also worked correctly
+                    #so let's mark that it ran here on a specific file
+                    with open(macro_path, 'a+') as inf:
+                        inf.write('{0}\n'.format(im_path))
                     
-                elif g.NSC_LABEL in dep_im_fname:
-                    dye_fname, dye_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+                    # let's move the output .txt's to the cache directory
+                    for label in oj_labels:
+                        txt_name = ' '.join([aniso_fname, label])
+                        from_path = os.path.join(g.dep, rel_path, txt_name)
+                        to_path =  os.path.join(g.cache_dir, rel_path, txt_name)
+                        os.rename(from_path, to_path)
+            
+                
+            elif g.NSC_LABEL in dep_im_fname:
+                dye_fname, dye_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
 
     
     
@@ -143,7 +158,7 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
         #anisotropy...
         
         start = time.clock()
-        aniso_data = h.get_aniso_data(flag = g.BATCH, relpath = rel_path) #for anisotropy data
+        aniso_data = h.get_aniso_data(flag = g.BATCH, root = g.cache_dir, relpath = rel_path) #for anisotropy data
         #aniso_fname, aniso_im = h.get_image(g.ANISO_IM)
         end = time.clock()
         print("get_aniso_data took {0} seconds for an image with {1} pixels.".format(end-start, reduce(lambda x,y: x*y, im_data_shape)))
@@ -203,7 +218,13 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
     #    end = time.clock()
     #    print("Getting high_aniso_coords took {0} seconds and ended up using method_high={1}.".format(end-start, method_low))
     #    
+        for info in info_ll:
+            if 'ROI_info' in info:
+                white_matter, gray_matter, injection_site = h.get_ROI_coords(info)
+                break
         
+        
+            
         high_aniso_coords, method_high = [], 'debugging'
         low_aniso_coords, method_low = [], 'debugging'
         
@@ -212,16 +233,19 @@ for rel_path, dep_im_fnames in zip(rel_paths, dep_ims_fname_ll):
         
         hist_ftype = 'PNG'
         
+        dye_coords_no_ij = a.coords      
         
         #naming histograms...
-        coords_list = [coords_of_interest, high_aniso_coords, low_aniso_coords, aniso_data.keys()]
-        coord_names = ['dye_coords', 'high_aniso_coords method={0}'.format(method_high), 'low_aniso_coords method={0}'.format(method_low), 'all_coords_(no_bg_or_artifacts)']
+        coords_dict = {'dye_coords': coords_of_interest, \
+        'high_aniso_coords method={0}'.format(method_high): high_aniso_coords, \
+        'low_aniso_coords method={0}'.format(method_low): low_aniso_coords, \
+        'all_coords_(no_bg_or_artifacts)': aniso_data.keys()}
         
         #clean coords in coords_list of any outlier or background coordinates...
         
         
         
-        for coords, coords_name in zip(coords_list, coord_names):
+        for coords_name, coords in coords_dict:
             n_bins = 100 #can be sequence if dimension_number>1
             hist_info = [dye_fname, color_of_interest, coords_name, len(coords), hist_ftype]
             #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename

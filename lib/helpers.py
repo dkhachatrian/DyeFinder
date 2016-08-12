@@ -221,11 +221,11 @@ def get_image(im_flag, fpath = None):
     return file_name, im
     
     
-def get_aniso_data(flag = None, relpath = None):
+def get_aniso_data(flag = None, root = None, relpath = None):
     """
     Prompts user for names of files corresponding to outputs of OrientationJ's parameters: orientation, coherence, and energy.
-    Input files are searched for in the script's dependencies folder.
-    Input files must haev been saved as a Text Image using ImageJ.
+    Input files are searched for in the relative path from root.
+    Input files must have been saved as a Text Image using ImageJ.
     
     Returns a dict of array coordinate-->coord_info (a namedtuple)
     
@@ -237,7 +237,7 @@ def get_aniso_data(flag = None, relpath = None):
     
     if flag == g.BATCH:
         data_list = {}
-        fdir = os.path.join(g.dep, relpath)
+        fdir = os.path.join(root, relpath)
         #changing = True #will keep track of whether len(data_list) changes
         
         for fname in [x for x in os.listdir(fdir) if x.endswith('.txt')]:
@@ -435,7 +435,7 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
     # maybe look into http://stackoverflow.com/questions/27156381/python-creating-a-2d-histogram-from-a-numpy-matrix
     
  
-    from matplotlib.colors import LogNorm
+    #from matplotlib.colors import LogNorm
     
     plt.cla()
     plt.clf()
@@ -454,7 +454,7 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
     
     title = ' '.join([title_prefix, title_postfix])
     
-    labels = list(reversed(labels)) #difference between array-like and image-like    
+    #labels = list(reversed(labels)) #difference between array-like and image-like #not true for 1D or 2D hist!
 #    
 #    if len(predicates) == 2: #2d histogram
 #        H, xedges, yedges = np.histogram2d(vals[0], vals[1], bins = bins, normed = True)
@@ -472,12 +472,12 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
 #        plt.ylabel(labels[1])
 #    
 #
-    fname = "{0} color_of_interest={1} {2} (n={3}) vals={6} histogram (bins={5}).{4}".format(*info, bins, labels)
+    fname = "{0} color_of_interest={1} {2} (n={3}) vals={6} {7}D histogram (bins={5}).{4}".format(*info, bins, labels, len(labels))
     
     
-    H, edges = np.histogramdd(vals_ll, bins = bins, normed = True)
+    #H, edges = np.histogramdd(vals_ll, bins = bins, normed = True)
     
-    if len(edges) == 1: #1d histogram
+    if len(labels) == 1: #1d histogram
         #redoing the binning, but it's worked in the past...
         fig, ax = plt.subplots()
         ax.hist(vals_ll, bins = bins, normed = True)
@@ -507,7 +507,7 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
 #        ax.set_ylabel(labels[1])
     
     
-    elif len(edges) == 2:
+    elif len(labels) == 2:
         # adapted from http://matplotlib.org/examples/pylab_examples/hist2d_log_demo.html
         plt.hist2d(vals_ll[0], vals_ll[1], bins = [bins,bins], normed = True)
         # plt.hist2d(vals_ll[0], vals_ll[1], bins = [bins,bins], normed = LogNorm())
@@ -535,7 +535,7 @@ def save_to_cache(var, info):
         pickle.dump(var, outf, pickle.HIGHEST_PROTOCOL)
     
 
-def set_up_outputs(main_root = g.dep, ftypes = g.IMAGE_FILETYPES, ignore_list = g.IGNORE_LIST):
+def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_list = g.IGNORE_LIST):
     """
     For batch running of images in 'dependencies', set up directories in the 'outputs' folder.
     Returns the paths to the image, relative to '/dependencies/'
@@ -546,7 +546,7 @@ def set_up_outputs(main_root = g.dep, ftypes = g.IMAGE_FILETYPES, ignore_list = 
     # TODO: pair up images in lists here to ensure no mixup in rest of script,
     # when there is more than one set of images in one directory    
     
-    rel_paths, im_names_ll = [], []
+    rel_paths, im_names_ll, related_info_ll = [], [], []
     
     #im_names_lll = []
     
@@ -558,6 +558,7 @@ def set_up_outputs(main_root = g.dep, ftypes = g.IMAGE_FILETYPES, ignore_list = 
     for root, dirs, files in os.walk(main_root, topdown = True):
         rel_path = os.path.relpath(root, main_root) #relative path from main_root to directory containing dirs and files
         im_names = []
+        info_names = []
         
         #remove values in ignore_list from dirs
         for i in ignore_list:
@@ -567,17 +568,34 @@ def set_up_outputs(main_root = g.dep, ftypes = g.IMAGE_FILETYPES, ignore_list = 
                 pass
             
             
+        if len(files) == 0:
+            continue
         #dirs = list(filter(lambda x: x not in ignore_list, dirs))
         #removes directories with the same name as any string in ignore_list 
         
 #        if '__ignore__' in dirs:
 #            dirs.remove('__ignore__')
+#        prefixes = []
+#        for f in files:
+#            prefixes.append(f.split(' ')[0]) #get all prefixes
+#            
+        prefixes = set([f.split(' ')[0] for f in files])
         
-        if len(files) > 0:
-            #see if there are .tif's (images to be processed) in the root dirctory
-            for f in files:
-                for ftype in ftypes:
-                    if f.endswith(ftype):
+        for prefix in prefixes:
+            related_files = [f for f in files if f.startswith(prefix)]
+            
+            for f in related_files:
+#                # remove from files list to shorten it for next search (worth it?)
+#                files.remove(f)
+            
+                # get related files (which I currently hardcode as .txt's)
+                if f.endswith('.txt'):
+                    info_names.append(f)
+                    continue
+                
+                # get images
+                for im_ftype in im_ftypes:
+                    if f.endswith(im_ftype):
                         #make dir for each directory containing tifs
                         #outputs
                         try:
@@ -592,13 +610,46 @@ def set_up_outputs(main_root = g.dep, ftypes = g.IMAGE_FILETYPES, ignore_list = 
                             pass #already exists
                         
                         im_names.append(f) #remember filenames found
-                        break #check next file
+                        break #check next file    
+                
+        
+        
+#        if len(files) > 0:
+#            #see if there are .tif's (images to be processed) in the root dirctory
+#            prefixes_seen = []
+#            for f in files:
+#                fparts = f.split(' ')
+#                f_prefix = fparts[0]
+#                
+#                if f_prefix in prefixes_seen:
+#                    continue
+#                for im_ftype in im_ftypes:
+#                    if f.endswith(im_ftype):
+#                        #make dir for each directory containing tifs
+#                        #outputs
+#                        try:
+#                            os.makedirs(os.path.join(g.out_dir, rel_path))
+#                        except os.error:
+#                            pass #already exists
+#                        
+#                        #cached files (e.g., .txt's)
+#                        try:
+#                            os.makedirs(os.path.join(g.cache_dir, rel_path))
+#                        except os.error:
+#                            pass #already exists
+#                        
+#                        im_names.append(f) #remember filenames found
+#                        break #check next file
+#                
+#                prefixes_seen.append(fparts[0])
+                
                     
         #add to lists. Even if empty (so unzipping works as expected)
         rel_paths.append(rel_path)
         im_names_ll.append(im_names)
+        related_info_ll.append(info_names)
         
-    return rel_paths, im_names_ll
+    return rel_paths, im_names_ll, related_info_ll
 
 
 def map_marked_pixels(outpath, coords, image_shape, fname):
