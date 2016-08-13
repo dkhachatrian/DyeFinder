@@ -34,6 +34,9 @@ IGNORE_LIST = ['__ignore__']
 PREFIX_SEPARATOR = ' '
 
 
+ROI_LABELS = ['WHITE_MATTER', 'GRAY_MATTER', 'INJECTION_SITE']
+roi_var_names = ['top_left_corner_pixel', 'length', 'width']
+
 
 out_dir = os.path.join(dname, 'outputs') #directory for output files
 

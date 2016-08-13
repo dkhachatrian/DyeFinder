@@ -30,4 +30,16 @@ def test_outlier_function():
     
     print('Done!')
     
-test_outlier_function()
+    
+
+def test_txt_feeder_function():
+    path = '/Users/mathoncuser/Dropbox/CoH_Stuff_Summer_2016/Python Scripts/DyeFinder/dependencies/testing_batcher/test ROI_info.txt'
+    
+    out = h.get_ROI_info_from_txt(path)
+    
+    return out
+
+
+test_txt_feeder_function()    
+#test_outlier_function()
+print('Done!')

@@ -672,6 +672,91 @@ def map_marked_pixels(outpath, coords, image_shape, fname):
     #im.show() #debugging
 
 
+
+def get_ROI_info_from_txt(info_path):
+    """
+    Input:
+    info = a path to a .txt file with specific formatting:
+            - ignore lines starting with '#'
+            - each new set of information is separated by '//' (and is labeled w)
+            - names found in labels (in function body), then an equals sign, followed by expected values
+    
+    Output:
+    a dict of dicts containing this information
+    """
+    import string
+    #from collections import defaultdict
+    #whitespace = ' \t\n'
+    ignore_char = '#'
+    newset_flag = '//'
+    assigner = '='
+    
+    info_dict = {}
+    info_dd = {}
+    label = None
+    
+    
+    with open(info_path, mode = 'r') as inf:
+        for line in inf:
+            
+            if set(g.roi_var_names) == info_dict.keys() and label is not None:
+                info_dd[label] = info_dict
+                info_dict = {}
+                label = None
+                
+            if line.startswith(ignore_char) or line == '\n':
+                continue
+            
+            if newset_flag in line:
+                # ensure there's a valid label
+                parts = line.split(newset_flag)
+                parts = [x.strip(string.whitespace) for x in parts]
+                while True:
+                    try:
+                        parts.remove('')
+                    except ValueError:
+                        break
+                
+                label = '_'.join(parts)
+            
+            elif assigner in line:
+                parts = line.split(assigner)
+                parts = [x.strip(string.whitespace) for x in parts]
+                
+                assert len(parts) == 2
+                
+                # add to dict
+                if parts[0] in g.roi_var_names:
+                    info_dict[parts[0]] = eval(parts[1], {}, {})
+                    #the two empty dicts correspond to globals and locals
+                else:
+                    raise HelperException("Variable name '{0}' from file {1} not recognized by script as an expected variable!".format(s[0], info_path))
+                
+    return info_dd
+                
+                
+def make_coords_list(d):
+    """
+    From a dictionary describing a rectangular ROI, return the corresponding 
+    list of coordinates (as used in an array) (*not* pixel locations).
+    """
+    
+    #corner = tuple(reversed(d[g.roi_var_names[0]]))
+    corner = d[g.roi_var_names[0]]
+    l = d[g.roi_var_names[1]]
+    w = d[g.roi_var_names[2]]
+    
+    coords_list = []
+    
+    for i in range(l):
+        for j in range(w):
+            coord = (j + corner[1], i + corner[0]) #pixel order and coord order reversed
+            coords_list.append(coord)
+            
+    return coords_list
+
+
+
 def get_coords(data, data_mask, predicate, quant_flag = g.LOW):
     """
     Get coords in data that pass a predicate function.
