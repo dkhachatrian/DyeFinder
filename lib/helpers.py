@@ -425,7 +425,24 @@ def collect_coords_of_interest(image, ignore_list = None, color = 'brown'):
 #    #return (hist, bin_edges)
 #    
     
-def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, bins = 100, drange=(0,1)):
+
+def get_measures(data, coords, measures):
+    """
+    Uses a list of functions (measures) to generate a dict of
+    label-->list_of_values
+    Returns this dict.
+    """
+    
+    label2vals = {}
+    
+    for measure in measures:
+        vals, label = measure(data,coords)
+        label2vals[label] = vals
+        
+    return label2vals
+    
+    
+def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100):
     """
     Bin datapoints corresponding to coordinates from a list (coords) to the data, according to a predicate function (predicate).
     The predicate function takes in a coord_info namedtuple, and outputs a value to be used to build the histogram.
@@ -440,13 +457,7 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
     plt.cla()
     plt.clf()
     
-    vals_ll = []
-    labels = [] #for good titling
-    
-    for pred in predicates:
-        vals, label = pred(data,coords)
-        vals_ll.append(vals)
-        labels.append(label)
+
     
     title_prefix = 'Histogram'
 #    title_info = ' and '.join(labels)
@@ -472,6 +483,8 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
 #        plt.ylabel(labels[1])
 #    
 #
+    labels = list(vals_dict.keys())
+    
     fname = "{0} color_of_interest={1} {2} (n={3}) vals={6} {7}D histogram (bins={5}).{4}".format(*info, bins, labels, len(labels))
     
     
@@ -480,7 +493,8 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
     if len(labels) == 1: #1d histogram
         #redoing the binning, but it's worked in the past...
         fig, ax = plt.subplots()
-        ax.hist(vals_ll, bins = bins, normed = True)
+        vals = list(vals_dict.values())[0]
+        ax.hist(vals, bins = bins, normed = True)
         ax.set_xlabel(labels[0])
         ax.set_title(title)
         
@@ -509,7 +523,8 @@ def plot_histogram_data(data, coords, outdir, info, title_postfix, predicates, b
     
     elif len(labels) == 2:
         # adapted from http://matplotlib.org/examples/pylab_examples/hist2d_log_demo.html
-        plt.hist2d(vals_ll[0], vals_ll[1], bins = [bins,bins], normed = True)
+        
+        plt.hist2d(vals_dict[labels[0]], vals_dict[labels[1]], bins = [bins,bins], range = [[0,1],[0,1]], normed = True)
         # plt.hist2d(vals_ll[0], vals_ll[1], bins = [bins,bins], normed = LogNorm())
         # plt.hist2d(vals_ll[0], vals_ll[1], bins=bins, normed=True)
         plt.colorbar()
@@ -538,15 +553,19 @@ def save_to_cache(var, info):
 def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_list = g.IGNORE_LIST):
     """
     For batch running of images in 'dependencies', set up directories in the 'outputs' folder.
-    Returns the paths to the image, relative to '/dependencies/'
-    More specifically, returns a list of directories relative to './dependencies/', and a list of list of files found in the same directory.
+    Returns a dictionary of (relative paths from dependencies) -->
+    dictionaries of (prefix) --> g.prefix_info objects.
+    
     Ignores files located in directories labeled '__ignore__'
     """
     
     # TODO: pair up images in lists here to ensure no mixup in rest of script,
     # when there is more than one set of images in one directory    
     
-    rel_paths, im_names_ll, related_info_ll = [], [], []
+#    rel_paths, im_names_ll, related_info_ll, prefixes_ll = [], [], [], []
+    
+    rel_path2prefix_dict = {}
+    #prefix2fnames = {} #prefix--> (list of im_names, list of related_info)
     
     #im_names_lll = []
     
@@ -559,6 +578,7 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
         rel_path = os.path.relpath(root, main_root) #relative path from main_root to directory containing dirs and files
         im_names = []
         info_names = []
+        prefix2fnames = {}
         
         #remove values in ignore_list from dirs
         for i in ignore_list:
@@ -579,10 +599,20 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
 #        for f in files:
 #            prefixes.append(f.split(' ')[0]) #get all prefixes
 #            
+        
+        new_dirs = [g.out_dir, g.cache_dir]
         prefixes = set([f.split(' ')[0] for f in files])
         
         for prefix in prefixes:
             related_files = [f for f in files if f.startswith(prefix)]
+
+            #make dir for each prefix -- separates the graphs
+            for d in new_dirs:
+                try:
+                    os.makedirs(os.path.join(d, rel_path, prefix))
+                except os.error:
+                    pass #already exists
+            
             
             for f in related_files:
 #                # remove from files list to shorten it for next search (worth it?)
@@ -596,22 +626,20 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
                 # get images
                 for im_ftype in im_ftypes:
                     if f.endswith(im_ftype):
-                        #make dir for each directory containing tifs
-                        #outputs
-                        try:
-                            os.makedirs(os.path.join(g.out_dir, rel_path))
-                        except os.error:
-                            pass #already exists
-                        
-                        #cached files (e.g., .txt's)
-                        try:
-                            os.makedirs(os.path.join(g.cache_dir, rel_path))
-                        except os.error:
-                            pass #already exists
+
                         
                         im_names.append(f) #remember filenames found
                         break #check next file    
+            
+            
+            prefix2fnames[prefix] = g.prefix_info(im_fnames = im_names, info_fnames = info_names)
                 
+        #also make aggregrate output/cache dir for each relative path
+        for d in new_dirs:
+            try:
+                os.makedirs(os.path.join(d,rel_path, g.aggregate_label))
+            except os.error:
+                pass
         
         
 #        if len(files) > 0:
@@ -643,13 +671,18 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
 #                
 #                prefixes_seen.append(fparts[0])
                 
-                    
-        #add to lists. Even if empty (so unzipping works as expected)
-        rel_paths.append(rel_path)
-        im_names_ll.append(im_names)
-        related_info_ll.append(info_names)
         
-    return rel_paths, im_names_ll, related_info_ll
+        rel_path2prefix_dict[rel_path] = prefix2fnames
+        
+#        rel_paths.append(rel_path)
+#        im_names_ll.append(im_names)
+#        related_info_ll.append(info_names)
+#        prefixes_ll.append(prefixes)
+    
+    
+    return rel_path2prefix_dict
+        
+#    return rel_paths, im_names_ll, related_info_ll, prefixes_ll
 
 
 def map_marked_pixels(outpath, coords, image_shape, fname):
@@ -757,113 +790,113 @@ def make_coords_list(d):
 
 
 
-def get_coords(data, data_mask, predicate, quant_flag = g.LOW):
-    """
-    Get coords in data that pass a predicate function.
-    data_mask is a data.shape NumPy array that states whether the coordinate in data is valid.
-    predicate takes three arguments: a g.aniso_tuple, a list of means, and a list of standard deviations
-    If too few (<0.001n) coordinates are chosen, instead use a quantile method.
-    """
-    # TODO: is data_mask deprecated? If so, remove from signature
-#    if data.shape[:-1] != data_mask.shape:
-#        raise HelperException("Data and data_mask's shape do not match as expected!")
-#    indexer = np.ndindex(data_mask.shape)
+#def get_coords(data, data_mask, predicate, quant_flag = g.LOW):
+#    """
+#    Get coords in data that pass a predicate function.
+#    data_mask is a data.shape NumPy array that states whether the coordinate in data is valid.
+#    predicate takes three arguments: a g.aniso_tuple, a list of means, and a list of standard deviations
+#    If too few (<0.001n) coordinates are chosen, instead use a quantile method.
+#    """
+#    # TODO: is data_mask deprecated? If so, remove from signature
+##    if data.shape[:-1] != data_mask.shape:
+##        raise HelperException("Data and data_mask's shape do not match as expected!")
+##    indexer = np.ndindex(data_mask.shape)
+##    
+##    
+##    #find mean and std of OK values
+##    
+##    
+##    for i in indexer:
+##        if data_mask[i]: #if not removed
 #    
+#    #find mean and std of remaining values
+#    vals = ([c.orientation for c in data.values()], [c.coherence for c in data.values()], [c.energy for c in data.values()])
+#    labels = ('orientation', 'coherence', 'energy')
+#    means = {l:s.mean(v) for l,v in zip(labels,vals)}
+#    stds = {l:s.stdev(v) for l,v in zip(labels, vals)}
+#    #means = {'orientation': s.mean(oris), 'coherence': s.mean(cohs), 'energy':s.mean(eners)}
+#    #means = g.coord_info(orientation=s.mean(oris), coherence = s.mean(cohs), energy = s.mean(eners))
+#    #stds = {}
+#    #stds = g.coord_info(orientation=s.stdev(oris, xbar = means.orientation), coherence = s.stdev(cohs, xbar = means.coherence), energy = s.stdev(eners, xbar = means.energy))
 #    
-#    #find mean and std of OK values
+#    coords = []
 #    
+#    for k in data:
+#        if predicate(data[k], means, stds):
+#            coords.append(k)
+#
+#    method = 'z_score'
+#
+#    DISC = 0.001    
 #    
-#    for i in indexer:
-#        if data_mask[i]: #if not removed
-    
-    #find mean and std of remaining values
-    vals = ([c.orientation for c in data.values()], [c.coherence for c in data.values()], [c.energy for c in data.values()])
-    labels = ('orientation', 'coherence', 'energy')
-    means = {l:s.mean(v) for l,v in zip(labels,vals)}
-    stds = {l:s.stdev(v) for l,v in zip(labels, vals)}
-    #means = {'orientation': s.mean(oris), 'coherence': s.mean(cohs), 'energy':s.mean(eners)}
-    #means = g.coord_info(orientation=s.mean(oris), coherence = s.mean(cohs), energy = s.mean(eners))
-    #stds = {}
-    #stds = g.coord_info(orientation=s.stdev(oris, xbar = means.orientation), coherence = s.stdev(cohs, xbar = means.coherence), energy = s.stdev(eners, xbar = means.energy))
-    
-    coords = []
-    
-    for k in data:
-        if predicate(data[k], means, stds):
-            coords.append(k)
-
-    method = 'z_score'
-
-    DISC = 0.001    
-    
-    if len(coords) < DISC * len(data):
-        method = 'quantile'
-        coords = []
-        if quant_flag == g.LOW:
-            quants = (0.15, 0.25) # deciles
-        elif quant_flag == g.HIGH:
-            quants = (0.75, 0.85)
-        
-        #faster, by multiplying values of interest
-        anisos_sorted = sorted(data.values(), key = predicate)        
-        indices = (np.multiply(quants, len(anisos_sorted))).astype(int)
-        
-        coords = [tuple(reversed(x.coord)) for x in anisos_sorted[indices.min():indices.max()]] #flip back from x.coord (pixel location) to coord (as it would appear as the corresponding element in a NumPy array)
-        
-        # slow but most thorough
-#        cohs_sorted = sorted(data.values(), key = lambda x: x.coherence)
-#        eners_sorted = sorted(data.values(), key = lambda x: x.energy)
+#    if len(coords) < DISC * len(data):
+#        method = 'quantile'
+#        coords = []
+#        if quant_flag == g.LOW:
+#            quants = (0.15, 0.25) # deciles
+#        elif quant_flag == g.HIGH:
+#            quants = (0.75, 0.85)
 #        
-#        indices = (np.multiply(quants, len(cohs_sorted))).astype(int)
+#        #faster, by multiplying values of interest
+#        anisos_sorted = sorted(data.values(), key = predicate)        
+#        indices = (np.multiply(quants, len(anisos_sorted))).astype(int)
 #        
-#        coords = [x.coord for x in cohs_sorted[indices.min():indices.max()] if x in eners_sorted] # O(n**2) ...
-        
-        
-        
-    
-    return coords, method
-    
+#        coords = [tuple(reversed(x.coord)) for x in anisos_sorted[indices.min():indices.max()]] #flip back from x.coord (pixel location) to coord (as it would appear as the corresponding element in a NumPy array)
+#        
+#        # slow but most thorough
+##        cohs_sorted = sorted(data.values(), key = lambda x: x.coherence)
+##        eners_sorted = sorted(data.values(), key = lambda x: x.energy)
+##        
+##        indices = (np.multiply(quants, len(cohs_sorted))).astype(int)
+##        
+##        coords = [x.coord for x in cohs_sorted[indices.min():indices.max()] if x in eners_sorted] # O(n**2) ...
+#        
+#        
+#        
+#    
+#    return coords, method
+#    
 
 
 
 
-def has_low_aniso(aniso_tuple, means, stds, z_bounds = (1.5,2.5)):
-    """
-    Returns whether the tuple has low anisotropy, characterized by being within z_bounds standard deviations *below* the mean. Also passed in: means and standard deviations for orientation, coherence, energy.
-    """
-    z_proper = np.multiply(z_bounds, -1)
-    return has_high_aniso(aniso_tuple, means, stds, z_bounds = z_proper)
-
-def has_high_aniso(aniso_tuple, means, stds, z_bounds = (1.5,2.5)):
-    """
-    Returns whether the tuple has low anisotropy, characterized by high energy and high coherency.
-    Also passed in: means and standard deviations for orientation, coherence, energy.
-    """
-    adict = aniso_tuple._asdict()
-    #adict,mdict,sdict = aniso_tuple._asdict(), means._asdict(), stds._asdict() #maybe I can get around having to use a _'d method...
-    for k in adict:
-        if k == 'coord' or k == 'orientation':
-            continue #don't care about these for now
-        if not falls_in_zrange(adict[k], means[k], stds[k], z_bounds):
-        #if not falls_in_zrange(adict[k], mdict[k], sdict[k], z_bounds):
-            return False
-    #if got here, falls in proper range for all cases
-    return True
-    
-    
-
-def give_quantile_range(data, low, high):
-    """
-    Returns values between the low'th percentile and high'th percentile
-    """    
-    
-    
-def falls_in_zrange(val, mean, std, z_bounds):
-    return (val > (mean + std*min(z_bounds)) and val < (mean + std*max(z_bounds)))
-
-
-def dict2np_arr(d):
-    """
-    Converts a dictionary of (NumPy coordinates) --> coord_info namedtuple into a NumPy array ...
-    """
-    pass #not yet convinced I will actually need to perform this conversion...
+#def has_low_aniso(aniso_tuple, means, stds, z_bounds = (1.5,2.5)):
+#    """
+#    Returns whether the tuple has low anisotropy, characterized by being within z_bounds standard deviations *below* the mean. Also passed in: means and standard deviations for orientation, coherence, energy.
+#    """
+#    z_proper = np.multiply(z_bounds, -1)
+#    return has_high_aniso(aniso_tuple, means, stds, z_bounds = z_proper)
+#
+#def has_high_aniso(aniso_tuple, means, stds, z_bounds = (1.5,2.5)):
+#    """
+#    Returns whether the tuple has low anisotropy, characterized by high energy and high coherency.
+#    Also passed in: means and standard deviations for orientation, coherence, energy.
+#    """
+#    adict = aniso_tuple._asdict()
+#    #adict,mdict,sdict = aniso_tuple._asdict(), means._asdict(), stds._asdict() #maybe I can get around having to use a _'d method...
+#    for k in adict:
+#        if k == 'coord' or k == 'orientation':
+#            continue #don't care about these for now
+#        if not falls_in_zrange(adict[k], means[k], stds[k], z_bounds):
+#        #if not falls_in_zrange(adict[k], mdict[k], sdict[k], z_bounds):
+#            return False
+#    #if got here, falls in proper range for all cases
+#    return True
+#    
+#    
+#
+#def give_quantile_range(data, low, high):
+#    """
+#    Returns values between the low'th percentile and high'th percentile
+#    """    
+#    
+#    
+#def falls_in_zrange(val, mean, std, z_bounds):
+#    return (val > (mean + std*min(z_bounds)) and val < (mean + std*max(z_bounds)))
+#
+#
+#def dict2np_arr(d):
+#    """
+#    Converts a dictionary of (NumPy coordinates) --> coord_info namedtuple into a NumPy array ...
+#    """
+#    pass #not yet convinced I will actually need to perform this conversion...

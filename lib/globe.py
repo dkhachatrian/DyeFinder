@@ -15,10 +15,13 @@ os.chdir(dname)
 from collections import namedtuple
 
 
+
 coord_labels = ['coord', 'orientation', 'coherence', 'energy']
 label2val = {x:i for i,x in enumerate(coord_labels)} #choose things by name
 
 coord_info = namedtuple('coord_info', coord_labels)
+
+prefix_info = namedtuple('prefix_info', ['im_fnames','info_fnames'])
 
 ANISO_LABEL = 'aniso' #in filename, for DiI stain
 NSC_LABEL = 'nsc_locs' #in filename, for brown stain
@@ -29,6 +32,7 @@ IMAGE_FILETYPES = ['.tif']
 #directories with labels in this list will be ignored
 # by h.set_up_outputs()
 IGNORE_LIST = ['__ignore__']
+
 
 
 PREFIX_SEPARATOR = ' '
@@ -43,6 +47,8 @@ out_dir = os.path.join(dname, 'outputs') #directory for output files
 cache_dir = os.path.join(dname, 'cache')
 
 ignore_dir = os.path.join(dep, '__ignore__')
+
+aggregate_label = 'aggregate'
 
 
 # create directories if necessary
