@@ -29,7 +29,7 @@ def weighted_anisotropy(data, coords):
     Returns coherence-weighted energy values in a dict of coord-->value.
     Also returns descriptor string.
     """
-    label = 'coherence-weighted energy values'
+    label = 'coherence-weighted energy'
     vals = []
     for c in coords:
         vals.append(data[c].coherence * data[c].energy)
@@ -44,7 +44,7 @@ def coherence(data, coords):
     Returns coherence values in a dict of coord-->value. 
     Also returns descriptor string.
     """
-    label = 'coherence values'
+    label = 'coherence'
     vals = []
     for c in coords:
         vals.append(data[c].coherence)
@@ -57,7 +57,7 @@ def energy(data, coords):
     Returns coherence values in a dict of coord-->value.
     Also returns descriptor string.
     """
-    label = 'energy values'
+    label = 'energy'
     vals = []
     for c in coords:
         vals.append(data[c].energy)

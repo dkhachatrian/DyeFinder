@@ -1,0 +1,20 @@
+# Begin any comments you may wish to place in this .txt file with a ‘#’
+# Labels for the ROI’s should be prepended with ‘//‘
+# Use the variable names ‘top_left_corner_pixel’, ‘length’, and ‘width’.
+# The program currently only supports rectangular ROIs.
+
+// WHITE_MATTER
+top_left_corner_pixel = (x,y)
+dx = w
+dy = h
+
+// GRAY_MATTER
+top_left_corner_pixel = (x,y)
+dx = w
+dy = h
+
+// INJECTION_SITE
+top_left_corner_pixel = (x,y)
+dx = w
+dy = h
+

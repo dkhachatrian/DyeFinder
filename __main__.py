@@ -65,6 +65,7 @@ for rel_path in relpath2prefix2info:
     
     labels2allvals = defaultdict(list)
     
+    
     for prefix in prefix_dict:
         fnames = prefix_dict[prefix]
         dep_im_fnames = fnames.im_fnames
@@ -73,7 +74,7 @@ for rel_path in relpath2prefix2info:
         if len(dep_im_fnames) == 0: # no images to process
             continue    
     
-        
+        rel_prefix_cache_dir = os.path.join(g.cache_dir, rel_path, prefix)        
         info_ddl = []
     
         for f in related_info_fnames:
@@ -178,8 +179,10 @@ for rel_path in relpath2prefix2info:
         
         #anisotropy...
         
+        
+        
         start = time.clock()
-        aniso_data = h.get_aniso_data(flag = g.BATCH, root = g.cache_dir, relpath = rel_path) #for anisotropy data
+        aniso_data = h.get_aniso_data(flag = g.BATCH, root = g.cache_dir, relpath = os.path.join(rel_path, prefix)) #for anisotropy data
         #aniso_fname, aniso_im = h.get_image(g.ANISO_IM)
         end = time.clock()
         print("get_aniso_data took {0} seconds for an image with {1} pixels.".format(end-start, reduce(lambda x,y: x*y, im_data_shape)))
@@ -247,7 +250,7 @@ for rel_path in relpath2prefix2info:
         #remove now
         
         
-        hist_ftype = 'PNG'
+        
         
         # copy NSC locations, remove injection site NSCs
         # using roundabout way to optimize time (instead of comparing two lists)
@@ -279,51 +282,37 @@ for rel_path in relpath2prefix2info:
         
         #clean coords in coords_list of any outlier or background coordinates...
         
-        
+        #save label2vals, so that a directory-wide list can be obtained
+
+#        h.create_plot(data = aniso_data, coords_dict = coords_dict, plot_type = 'histogram', cache_flag = True, cache_loc = rel_cache_dir)
+        coord_name2vals_dict = {}
         
         for coords_name in coords_dict:
             coords = coords_dict[coords_name]
             n_bins = 100 #can be sequence if dimension_number>1
-            hist_info = [dye_fname, color_of_interest, coords_name, len(coords), hist_ftype]
+            hist_info = [dye_fname, color_of_interest, coords_name, len(coords), g.hist_ftype]
             #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename
             title_p = "for specified group: {0}".format(coords_name)
             
             label2vals = h.get_measures(data = aniso_data, coords = coords, measures = aniso_measures)
             
+            coord_name2vals_dict[coords_name] = label2vals
+            
             # dump the dictionaries, for use afterward
             fname = '{0} dict.p'.format(coords_name)
-            with open(os.path.join(g.cache_dir, rel_path, prefix, fname), mode = 'w') as out:
-                pickle.dump(label2vals, out, pickle.HIGHEST_PROTOCOL)
+#            with open(os.path.join(rel_prefix_cache_dir, fname), mode = 'wb') as out:
+#                pickle.dump(label2vals, out, pickle.HIGHEST_PROTOCOL)
             
             h.plot_histogram_data(vals_dict = label2vals, outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins)
         
         coord_labels = list(coords_dict.keys())
         
-        #dump labels, to refind appropriate values later
-        with open(os.path.join(g.cache_dir, rel_path, prefix, 'coord_labels.p'), mode = 'w') as out:
-            pickle.dump(label2vals,out,pickle.HIGHEST_PROTOCOL)
-        
-        
-        ## Coordinates of Interest
-        #hist_info = 'dye_fname={0} color_of_interest_(HSV)={1} coords_of_interest histogram.{2}'.format(dye_fname, color_of_interest, hist_ftype)
-        #hist_title = 'E*C for within specified color threshold.'
-        #h.plot_histogram_data(aniso_data, coords = coords_of_interest, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
-        
-        
-        ## All non-artifact/non-background coordinates
-        #
-        #hist_info = 'dye_fname={0} all_coordinates histogram.{1}'.format(dye_fname, hist_ftype)
-        #if not os.path.exists(os.path.join(g.cache_dir, hist_info)):
-        #    hist_title = 'E*C for entire image.'
-        #    indexer = np.ndindex(im_data_shape)
-        #    h.plot_histogram_data(aniso_data, coords = indexer, fname = hist_info, title = hist_title, predicate = h.weighted_anisotropy, bins = 100)
-        #    
-        
-        
-        
-        #pixels_of_interest = [tuple(reversed(i)) for i in coords_of_interest] #reversed to match (x,y)
-        #pixels_info = 'dye_fname={0} color_of_interest_(HSV)={1} pixels_of_interest.p'.format(dye_fname,color_of_interest)
-        #h.save_to_cache(pixels_of_interest, pixels_info)
+        #dump dict and labels, to refind appropriate values later
+        with open(os.path.join(rel_prefix_cache_dir, 'coord_labels list.p'), mode = 'wb') as out:
+            pickle.dump(coord_labels,out,pickle.HIGHEST_PROTOCOL)
+            
+        with open(os.path.join(rel_prefix_cache_dir, 'coord_name2vals_dict dict.p'), mode = 'wb') as out:
+            pickle.dump(coord_name2vals_dict,out,pickle.HIGHEST_PROTOCOL)
         
         
         h.map_marked_pixels(outpath = out_dir, coords = coords_of_interest, image_shape = dye_im.size, fname = '{0} dye_marked_pixels.png'.format(f_prefix))
@@ -336,8 +325,21 @@ for rel_path in relpath2prefix2info:
         print("It took {0} seconds to perform the operations on the paired image list {1}.".format(end_total-start_total, dep_im_fnames))
         print() #one newline space between paired image lists
 
-    # TODO: load appropriate dictionary files. Obtain directory-wide list of values. Plot
 
+    # aggregate across entire directory
+    # TODO: load appropriate dictionary files. Obtain directory-wide list of values. Plot
+    rel_cache_dir = os.path.join(g.cache_dir, rel_path)
+    labels2allvals = h.load_all_vals(rel_cache_dir, cache_flag = True)
+    
+    out_dir = os.path.join(g.out_dir, rel_path, g.aggregate_label)
+    for label in labels2allvals:
+        vals = labels2allvals[label]
+        n_bins = 100
+        hist_info = ['aggregate', color_of_interest, label, len(vals), g.hist_ftype]
+        #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename
+        title_p = "for specified group: {0}".format(label)
+        
+        h.plot_histogram_data(vals_dict = label2vals, outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins)
 
 
 print('Done!')

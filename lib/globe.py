@@ -15,6 +15,10 @@ os.chdir(dname)
 from collections import namedtuple
 
 
+#coords_dict_keys = []
+
+sample_roi_skeleton_path = os.path.join(dname, 'skeletal ROI_info.txt')
+
 
 coord_labels = ['coord', 'orientation', 'coherence', 'energy']
 label2val = {x:i for i,x in enumerate(coord_labels)} #choose things by name
@@ -31,15 +35,17 @@ IMAGE_FILETYPES = ['.tif']
 
 #directories with labels in this list will be ignored
 # by h.set_up_outputs()
-IGNORE_LIST = ['__ignore__']
+IGNORE_DIR_LIST = ['__ignore__']
+IGNORE_FILE_STARTS_LIST = ['.']
 
+hist_ftype = 'PNG'
 
 
 PREFIX_SEPARATOR = ' '
 
 
 ROI_LABELS = ['WHITE_MATTER', 'GRAY_MATTER', 'INJECTION_SITE']
-roi_var_names = ['top_left_corner_pixel', 'length', 'width']
+roi_var_names = ['top_left_corner_pixel', 'dx', 'dy']
 
 
 out_dir = os.path.join(dname, 'outputs') #directory for output files

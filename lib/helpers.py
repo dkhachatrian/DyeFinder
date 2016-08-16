@@ -13,6 +13,8 @@ from PIL import Image
 import numpy as np
 from matplotlib import colors
 from matplotlib import cm
+import shutil
+import filecmp
 
 import matplotlib.pyplot as plt
 plt.ioff() #ensure no windows are opened while running the script
@@ -425,6 +427,20 @@ def collect_coords_of_interest(image, ignore_list = None, color = 'brown'):
 #    #return (hist, bin_edges)
 #    
     
+    
+#def create_plot(coords_dict, plot_type = 'histogram', cache_flag = True, cache_loc = None):
+#    """
+#    Uses plot_type to determine which plotting function to call.
+#    If cache_flag is set to True, saves pickled objects to specified cache_loc
+#    (which must be provided).
+#    
+#    """
+#    if cache_flag == True and cache_loc is None:
+#        raise HelperException("create_plot was called with cache_flag set to True and cache_loc unspecified!")
+#    
+#
+#    
+    
 
 def get_measures(data, coords, measures):
     """
@@ -441,6 +457,9 @@ def get_measures(data, coords, measures):
         
     return label2vals
     
+    
+    
+
     
 def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100):
     """
@@ -550,7 +569,7 @@ def save_to_cache(var, info):
         pickle.dump(var, outf, pickle.HIGHEST_PROTOCOL)
     
 
-def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_list = g.IGNORE_LIST):
+def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_starts_list = g.IGNORE_FILE_STARTS_LIST, ignore_dir_list = g.IGNORE_DIR_LIST):
     """
     For batch running of images in 'dependencies', set up directories in the 'outputs' folder.
     Returns a dictionary of (relative paths from dependencies) -->
@@ -572,21 +591,24 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
     #im_names_lll will hold all im_names_ll
     #im_names_ll will hold pairs of images with the same beginning filename
     
-
+    all_files_have_info = True
     
     for root, dirs, files in os.walk(main_root, topdown = True):
         rel_path = os.path.relpath(root, main_root) #relative path from main_root to directory containing dirs and files
-        im_names = []
-        info_names = []
+#        im_names = []
+#        info_names = []
         prefix2fnames = {}
         
         #remove values in ignore_list from dirs
-        for i in ignore_list:
+        for i in ignore_dir_list:
             try:
                 dirs.remove(i)
             except ValueError: #not in list
                 pass
-            
+
+        for i in ignore_starts_list:
+            files = [f for f in files if not f.startswith(i)]
+        
             
         if len(files) == 0:
             continue
@@ -603,7 +625,11 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
         new_dirs = [g.out_dir, g.cache_dir]
         prefixes = set([f.split(' ')[0] for f in files])
         
+        
+        
         for prefix in prefixes:
+            im_names = []
+            info_names = []
             related_files = [f for f in files if f.startswith(prefix)]
 
             #make dir for each prefix -- separates the graphs
@@ -614,13 +640,17 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
                     pass #already exists
             
             
+            info_file_exists = False
+            
             for f in related_files:
 #                # remove from files list to shorten it for next search (worth it?)
 #                files.remove(f)
             
                 # get related files (which I currently hardcode as .txt's)
-                if f.endswith('.txt'):
+                # make sure they changed the skeleton
+                if f.endswith('.txt') and not filecmp.cmp(os.path.join(root,f), g.sample_roi_skeleton_path):
                     info_names.append(f)
+                    info_file_exists = True
                     continue
                 
                 # get images
@@ -630,9 +660,22 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
                         
                         im_names.append(f) #remember filenames found
                         break #check next file    
+                
+            
+            if not info_file_exists:
+                
+                all_files_have_info = False
+                #place .txt stub to be filled out
+                txtname = "{0} ROI_info.txt".format(prefix)
+                new_txt_path = os.path.join(root, txtname)
+                
+                shutil.copy(g.sample_roi_skeleton_path, new_txt_path)
+                
             
             
             prefix2fnames[prefix] = g.prefix_info(im_fnames = im_names, info_fnames = info_names)
+            
+            
                 
         #also make aggregrate output/cache dir for each relative path
         for d in new_dirs:
@@ -680,9 +723,82 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
 #        prefixes_ll.append(prefixes)
     
     
+    if not all_files_have_info:
+        info_string = "Not all pairs of images had associated ROI_info.txt's!\
+        Please fill out the .txt stubs and re-run this program."
+        raise HelperException(info_string)
+    
     return rel_path2prefix_dict
         
 #    return rel_paths, im_names_ll, related_info_ll, prefixes_ll
+
+
+def load_all_vals(cache_dir, cache_flag = False):
+    """
+    Loads all pickled dictionaries within cache_dir to make one large dictionary,
+    using the list of pickled labels in that same directory.
+    Will be used to create a master dictionary of 'type of coordinate' --> 'value'
+    for all images in a directory.
+    Returns said dict.
+    
+    If cache_flag is set to True, saves the extended dictionary to relative
+    aggregate directory.
+    """
+    from collections import defaultdict
+    #coordname2label2vals = defaultdict(defaultdict(list))
+    
+    coordname2label2vals = defaultdict(defaultdict)
+    
+    #first, see if there's anything in the aggregate folder
+    
+#    for root, dirs, files in os.walk(cache_dir):
+#        if root != os.path.join(cache_dir, g.aggregate_label):
+#            continue
+#        
+#        if len(files) > 0:
+#            if 'dict.p' in files:
+#                with open(os.path.join(root, 'dict.p'), mode = 'rb') as inf:
+#                    coordname2label2vals = pickle.load(inf)
+#                    return coordname2label2vals
+    
+    for root, dirs, files in os.walk(cache_dir):
+
+        try:
+            dirs.remove(g.aggregate_label)
+        except ValueError:
+            pass
+        
+        relevant_files = [f for f in files if f.endswith('.p')] #only want pickled files
+        
+#        #first load labels
+#        for f in relevant_files:
+#            if f.endswith('list.p'):
+#                with open(os.path.join(root,f), mode='rb') as inf:
+#                    labels = pickle.load(inf)
+#                    break
+                
+        if len(relevant_files) == 0:
+            continue
+        
+        # load dictionary
+        for f in relevant_files:
+            if f.endswith('dict.p'):
+                with open(os.path.join(root,f), mode='rb') as inf:
+                    coord_name2vals_dict = pickle.load(inf)
+                    break
+                
+        #extend masterdict
+        for coord_name in coord_name2vals_dict:
+            vals_dict = coord_name2vals_dict[coord_name]
+            for val_label in vals_dict:
+                coordname2label2vals[coord_name][val_label].extend(vals_dict[val_label])
+            
+            
+    if cache_flag:
+        with open(os.path.join(cache_dir, g.aggregate_label, 'dict.p'), mode = 'wb') as out:
+            pickle.dump(coordname2label2vals, out, pickle.HIGHEST_PROTOCOL)
+            
+    return coordname2label2vals
 
 
 def map_marked_pixels(outpath, coords, image_shape, fname):
@@ -729,7 +845,7 @@ def get_ROI_info_from_txt(info_path):
     label = None
     
     
-    with open(info_path, mode = 'r') as inf:
+    with open(info_path, mode = 'r', encoding = 'utf8') as inf:
         for line in inf:
             
             if set(g.roi_var_names) == info_dict.keys() and label is not None:
@@ -776,13 +892,13 @@ def make_coords_list(d):
     
     #corner = tuple(reversed(d[g.roi_var_names[0]]))
     corner = d[g.roi_var_names[0]]
-    l = d[g.roi_var_names[1]]
-    w = d[g.roi_var_names[2]]
+    dx = d[g.roi_var_names[1]]
+    dy = d[g.roi_var_names[2]]
     
     coords_list = []
     
-    for i in range(l):
-        for j in range(w):
+    for i in range(dx):
+        for j in range(dy):
             coord = (j + corner[1], i + corner[0]) #pixel order and coord order reversed
             coords_list.append(coord)
             
