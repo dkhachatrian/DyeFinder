@@ -18,6 +18,7 @@ import filecmp
 
 import matplotlib.pyplot as plt
 plt.ioff() #ensure no windows are opened while running the script
+from collections import defaultdict
 
 import pickle
 import os
@@ -502,7 +503,7 @@ def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100):
 #        plt.ylabel(labels[1])
 #    
 #
-    labels = list(vals_dict.keys())
+    labels = sorted(list(vals_dict.keys())) #a way of keeping axes consistent across function calls
     
     fname = "{0} color_of_interest={1} {2} (n={3}) vals={6} {7}D histogram (bins={5}).{4}".format(*info, bins, labels, len(labels))
     
@@ -732,6 +733,20 @@ def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_
         
 #    return rel_paths, im_names_ll, related_info_ll, prefixes_ll
 
+#def recursive_defaultdict(dd = defaultdict, levels = 0, dtype = None):
+#    """
+#    Specify a (defaultdict of)*levels of dtype.
+#    if levels < 1, simply returns dtype.
+#    """
+#    
+#    if levels < 1:
+#        return dtype
+#    if levels == 1:
+#        return defaultdict(dtype)
+#    # else
+#    return defaultdict(defaultdict, (levels - 1, dtype))
+    
+
 
 def load_all_vals(cache_dir, cache_flag = False):
     """
@@ -744,11 +759,11 @@ def load_all_vals(cache_dir, cache_flag = False):
     If cache_flag is set to True, saves the extended dictionary to relative
     aggregate directory.
     """
-    from collections import defaultdict
+    
     #coordname2label2vals = defaultdict(defaultdict(list))
     
-    coordname2label2vals = defaultdict(defaultdict)
-    
+#    coordname2label2vals = defaultdict(lambda: defaultdict(list)) #will be dict of dict of lists
+#    coordname2label2vals = recursive_defaultdict(levels = 2, dtype = list)
     #first, see if there's anything in the aggregate folder
     
 #    for root, dirs, files in os.walk(cache_dir):
@@ -761,8 +776,9 @@ def load_all_vals(cache_dir, cache_flag = False):
 #                    coordname2label2vals = pickle.load(inf)
 #                    return coordname2label2vals
     
+    coordname2label2vals = defaultdict(dict)
+    
     for root, dirs, files in os.walk(cache_dir):
-
         try:
             dirs.remove(g.aggregate_label)
         except ValueError:
@@ -791,8 +807,11 @@ def load_all_vals(cache_dir, cache_flag = False):
         for coord_name in coord_name2vals_dict:
             vals_dict = coord_name2vals_dict[coord_name]
             for val_label in vals_dict:
-                coordname2label2vals[coord_name][val_label].extend(vals_dict[val_label])
-            
+                coordname2label2vals[coord_name].setdefault(val_label, []).extend(vals_dict[val_label])
+                # in the dict (value of defaultdict(dict)), if the label already
+                # exists, extend the list by the subdict's values
+                # otherwise, first set a default value of an empty list
+                # then extend the list.
             
     if cache_flag:
         with open(os.path.join(cache_dir, g.aggregate_label, 'dict.p'), mode = 'wb') as out:
@@ -843,6 +862,7 @@ def get_ROI_info_from_txt(info_path):
     info_dict = {}
     info_dd = {}
     label = None
+    
     
     
     with open(info_path, mode = 'r', encoding = 'utf8') as inf:

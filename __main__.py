@@ -305,6 +305,9 @@ for rel_path in relpath2prefix2info:
             
             h.plot_histogram_data(vals_dict = label2vals, outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins)
         
+        #unload the fairly large dict to allow for garbage collection
+        aniso_data = None
+        
         coord_labels = list(coords_dict.keys())
         
         #dump dict and labels, to refind appropriate values later
@@ -329,17 +332,20 @@ for rel_path in relpath2prefix2info:
     # aggregate across entire directory
     # TODO: load appropriate dictionary files. Obtain directory-wide list of values. Plot
     rel_cache_dir = os.path.join(g.cache_dir, rel_path)
-    labels2allvals = h.load_all_vals(rel_cache_dir, cache_flag = True)
+    start = time.clock()
+    labels2vals_dicts = h.load_all_vals(rel_cache_dir, cache_flag = True)
+    end = time.clock()
+    print("Creating/loading the aggregate dictionary for {0} took {1} seconds.".format(rel_path, end-start))
     
     out_dir = os.path.join(g.out_dir, rel_path, g.aggregate_label)
-    for label in labels2allvals:
-        vals = labels2allvals[label]
+    for label in labels2vals_dicts:
+        vals = labels2vals_dicts[label]
         n_bins = 100
-        hist_info = ['aggregate', color_of_interest, label, len(vals), g.hist_ftype]
+        hist_info = ['aggregate', color_of_interest, label, len(vals['coherence']), g.hist_ftype]
         #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename
         title_p = "for specified group: {0}".format(label)
         
-        h.plot_histogram_data(vals_dict = label2vals, outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins)
+        h.plot_histogram_data(vals_dict = labels2vals_dicts[label], outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins)
 
 
 print('Done!')
