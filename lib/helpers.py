@@ -543,8 +543,15 @@ def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100):
     
     elif len(labels) == 2:
         # adapted from http://matplotlib.org/examples/pylab_examples/hist2d_log_demo.html
+        X = vals_dict[labels[0]]
+        Y = vals_dict[labels[1]]
+        # don't count bins with less than epsilon of the total number
+        # (or that have nothing in them)
+        epsilon = 0.001
+        low_bound = int(max(1, epsilon * len(X)))
         
-        plt.hist2d(vals_dict[labels[0]], vals_dict[labels[1]], bins = [bins,bins], range = [[0,1],[0,1]], normed = True)
+        
+        plt.hist2d(X,Y, bins = [bins,bins], range = [[0,1],[0,1]], cmin = low_bound, normed = True)
         # plt.hist2d(vals_ll[0], vals_ll[1], bins = [bins,bins], normed = LogNorm())
         # plt.hist2d(vals_ll[0], vals_ll[1], bins=bins, normed=True)
         plt.colorbar()
