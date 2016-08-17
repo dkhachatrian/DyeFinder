@@ -459,7 +459,7 @@ def get_measures(data, coords, measures):
     return label2vals
     
     
-    
+
 
     
 def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100):
@@ -785,6 +785,13 @@ def load_all_vals(cache_dir, cache_flag = False):
     
     coordname2label2vals = defaultdict(dict)
     
+    dict_path = os.path.join(cache_dir, g.aggregate_label, 'dict.p')
+    #load cache if available
+    if os.path.exists(dict_path):
+        with open(dict_path, mode = 'rb') as inf:
+            coordname2label2vals = pickle.load(inf)
+            return coordname2label2vals
+    
     for root, dirs, files in os.walk(cache_dir):
         try:
             dirs.remove(g.aggregate_label)
@@ -821,7 +828,7 @@ def load_all_vals(cache_dir, cache_flag = False):
                 # then extend the list.
             
     if cache_flag:
-        with open(os.path.join(cache_dir, g.aggregate_label, 'dict.p'), mode = 'wb') as out:
+        with open(dict_path, mode = 'wb') as out:
             pickle.dump(coordname2label2vals, out, pickle.HIGHEST_PROTOCOL)
             
     return coordname2label2vals
