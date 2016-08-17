@@ -47,6 +47,7 @@ remove_outliers = False
 
 relpath2prefix2info = h.parse_dependencies()
 
+aggregates_different_flag = False
 
 color_of_interest = 'brown'
 
@@ -376,7 +377,7 @@ for rel_path in relpath2prefix2info:
         #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename
         title_p = "for specified group: {0}".format(label)
         
-        h.plot_histogram_data(vals_dict = labels2vals_dicts[label], outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins)
+        h.plot_histogram_data(vals_dict = labels2vals_dicts[label], outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins, aggregate_flag = aggregates_different_flag) #, aggregate_flag = True
 
 
 print('Done!')

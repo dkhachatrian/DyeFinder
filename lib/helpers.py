@@ -462,7 +462,7 @@ def get_measures(data, coords, measures):
 
 
     
-def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100):
+def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100, drange = None, aggregate_flag = False):
     """
     Bin datapoints corresponding to coordinates from a list (coords) to the data, according to a predicate function (predicate).
     The predicate function takes in a coord_info namedtuple, and outputs a value to be used to build the histogram.
@@ -550,8 +550,14 @@ def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100):
         epsilon = 0.001
         low_bound = int(max(1, epsilon * len(X)))
         
+        if drange is None:
+            if aggregate_flag:
+                drange = [[0, max(X)], [0, max(Y)]]
+            else:
+                drange = [[0,1],[0,1]]
         
-        plt.hist2d(X,Y, bins = [bins,bins], range = [[0,1],[0,1]], cmin = low_bound, normed = True)
+        
+        plt.hist2d(X,Y, bins = [bins,bins], range = drange, cmin = low_bound, normed = True)
         # plt.hist2d(vals_ll[0], vals_ll[1], bins = [bins,bins], normed = LogNorm())
         # plt.hist2d(vals_ll[0], vals_ll[1], bins=bins, normed=True)
         plt.colorbar()
