@@ -23,13 +23,43 @@ from collections import defaultdict
 import pickle
 import os
 import statistics as s
+import numpy as np
 
 from lib import globe as g
+
+from matplotlib.colors import LogNorm
 
 
 # so can throw exception at bad locations
 class HelperException(Exception):
     pass
+
+
+def write_dict_of_dicts_as_csv(dd, out_path):
+    """
+    Given a dict of dict of lists, produces a csv at out_path
+    with each dict separated into different columns.
+    """
+    # Adapted from http://stackoverflow.com/questions/23613426/write-dictionary-of-lists-to-a-csv-file
+    
+    
+    import csv
+    
+    with open(out_path, "w") as outf:
+        writer = csv.writer(outf, delimiter = ",") #should naturally work when opened in Excel now
+        for dict_label in dd:
+            d = dd[dict_label]
+#            writer.writerow(dict_label)
+            outf.write('{0}\n'.format(dict_label))
+            value_labels = sorted(d.keys())
+            writer.writerow(value_labels)
+            writer.writerows(zip(*[d[key] for key in value_labels]))
+            
+#    with open(out_path, 'w') as outf:
+#        for dict_label in dd:
+#            
+
+
 
 
 def prompt_user_to_set_up_files():
@@ -459,10 +489,18 @@ def get_measures(data, coords, measures):
     return label2vals
     
     
-
+def remove_low_values(data, epsilon):
+    """
+    If the energy or coherence of a coord in the dict data is below epsilon,
+    remove it.
+    More forceful than remove_background function, but allows for
+    attempts to log-scale the data when doing plt.colorbar() for plt.hist2d().
+    """
+    
+    
 
     
-def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100, drange = None, aggregate_flag = False):
+def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100, drange = None, aggregate_flag = False, log_flag = True):
     """
     Bin datapoints corresponding to coordinates from a list (coords) to the data, according to a predicate function (predicate).
     The predicate function takes in a coord_info namedtuple, and outputs a value to be used to build the histogram.
@@ -505,13 +543,14 @@ def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100, dran
 #
     labels = sorted(list(vals_dict.keys())) #a way of keeping axes consistent across function calls
     
-    fname = "{0} color_of_interest={1} {2} (n={3}) vals={6} {7}D histogram (bins={5}).{4}".format(*info, bins, labels, len(labels))
+
     
     
     #H, edges = np.histogramdd(vals_ll, bins = bins, normed = True)
     
     if len(labels) == 1: #1d histogram
         #redoing the binning, but it's worked in the past...
+        low_bin_n = 0
         fig, ax = plt.subplots()
         vals = list(vals_dict.values())[0]
         ax.hist(vals, bins = bins, normed = True)
@@ -543,29 +582,91 @@ def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100, dran
     
     elif len(labels) == 2:
         # adapted from http://matplotlib.org/examples/pylab_examples/hist2d_log_demo.html
-        X = vals_dict[labels[0]]
-        Y = vals_dict[labels[1]]
+        X = np.array(vals_dict[labels[0]])
+        Y = np.array(vals_dict[labels[1]])
         # don't count bins with less than epsilon of the total number
         # (or that have nothing in them)
-        epsilon = 0.001
-        low_bound = int(max(1, epsilon * len(X)))
+        epsilon = 0.0005
+        low_bin_n = int(max(1, epsilon * len(X)))
+        # ^too harsh?
+        
+#        low_bin_n = 1
+
+#        if log_flag:
+#            # log-transform the data
+#            labels = ['log({0})'.format(l) for l in labels]
+#            bins = 100
+#            X_old, Y_old, X,Y = X, Y, np.log(X), np.log(Y) #log is base-2
+#            # -log preserves "order" of val_small --> to the left/bottom of plot
+#            low_bound = 1 #need at least one thing fall into the bin to show up
+
         
         if drange is None:
-            if aggregate_flag:
-                drange = [[0, max(X)], [0, max(Y)]]
-            else:
-                drange = [[0,1],[0,1]]
+            # range will be between the 10th and 90th percentile
+            lowp = .1
+            highp = .9
+            drange = [ [0,1], [0,1] ]
+            for i, arr in enumerate((X,Y)):
+                arr_sort = sorted(arr)
+                low, high = int(lowp*len(arr_sort)), int(highp*len(arr_sort))
+                drange[i][0], drange[i][1] = arr_sort[low], arr_sort[high]
+#            x_sort = sorted(X)
+#            minx,maxx = x_sort[lowp*len(x_sort)], x_sort[highp*len(x_sort)]
+#            
+#            y_sort = sorted(Y)
+#            miny,maxy
+#            
+            
+#            # log binning
+#            if log_flag:
+#                minx, miny = -6, -6
+#                # -log_2(value) <= 6 with the resolution OrientationJ provides
+#            else:
+#                minx, miny = 0, 0
+#            
+#            if aggregate_flag:
+#                maxx,maxy = max(X), max(Y)
+#            else:
+#                if log_flag:
+#                    maxx,maxy = 0,0
+#                else:
+#                    maxx,maxy = 1,1
+#            
+##            minx,miny = 0,0
+##            if log_flag:
+##                maxx,maxy = 6,6 #basically nothing went past 6
+##                # meaning, -log_2(value) <= 6 with the resolution OrientationJ provides
+##            else:
+##                maxx,maxy = 1,1 #falls between [0,1] naturally
+##            
+#            
+#
+##            if aggregate_flag:
+##                drange = [[0, max(X)], [0, max(Y)]]
+##            else:
+##                if log_flag:
+##                    drange = [[-10,0], [-10, 0]] #range captures values of [0.001,1]
+##                else:
+##                    drange = [[0,1],[0,1]]
+#
+#            drange = [[minx,maxx],[miny,maxy]]
+            
+            # no log-scaling
+#            drange = [ [0,1] , [0,1] ]
         
-        
-        plt.hist2d(X,Y, bins = [bins,bins], range = drange, cmin = low_bound, normed = True)
+#        if log_flag:
+#            plt.hist2d(X,Y, bins = [bins,bins], range = drange, cmin = low_bound, norm = LogNorm())
+#        else:
+        plt.hist2d(X,Y, bins = [bins,bins], range = drange, cmin = low_bin_n)
         # plt.hist2d(vals_ll[0], vals_ll[1], bins = [bins,bins], normed = LogNorm())
         # plt.hist2d(vals_ll[0], vals_ll[1], bins=bins, normed=True)
         plt.colorbar()
         plt.xlabel(labels[0])
         plt.ylabel(labels[1])
         plt.title(title)
-        
-     
+
+    fname = "{0} color_of_interest={1} {2} (n={3}) vals={6} {7}D histogram (bins={5}, low_bin_nin={8}).{4}".format(*info, bins, labels, len(labels), low_bin_n)     
+  
     plt.savefig(os.path.join(outdir,fname))
     plt.close('all')
     #plt.close(fig) # remove figure from memory

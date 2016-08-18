@@ -4,6 +4,8 @@
 
 Finds pixels with specified color and coregisters them with anisotropy data. Produces a histogram showing distribution of pixels of interest with anisotropy information at said pixel.
 
+Hi PowerPoint!
+
 """
 
 from lib import helpers as h
@@ -190,6 +192,10 @@ for rel_path in relpath2prefix2info:
             f_prefix = dye_fname
             
         
+        
+        
+        
+        
             
             
     #        Z = 4
@@ -203,6 +209,10 @@ for rel_path in relpath2prefix2info:
             #aniso_fname, aniso_im = h.get_image(g.ANISO_IM)
             end = time.clock()
             print("get_aniso_data took {0} seconds for an image with {1} pixels.".format(end-start, reduce(lambda x,y: x*y, im_data_shape)))
+            
+            # allows for log scale            
+            h.remove_low_values(data = aniso_data, epsilon = 0.001) 
+            
             
             
     #        validity_mask, outlier_coords = h.make_validity_mask(np.array(aniso_im.convert('L')), z = Z)

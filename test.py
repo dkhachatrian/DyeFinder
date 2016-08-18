@@ -9,6 +9,7 @@ from lib import helpers as h
 from lib import globe as g
 import numpy as np
 import os
+import pickle
 
 def test_outlier_function():
 
@@ -54,8 +55,19 @@ def test_load_all_vals():
         
         h.plot_histogram_data(vals_dict = labels2allvals, outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins)
 
+def test_csv_writer():
+    outpath = 'test.csv'
+    dict_path = '/Users/mathoncuser/Dropbox/CoH_Stuff_Summer_2016/Python Scripts/DyeFinder/cache/t = 9 months/_M40/coord_name2vals_dict dict.p'
+    with open(dict_path, 'rb') as inf:
+        dd = pickle.load(inf)
+    
+    h.write_dict_of_dicts_as_csv(dd, outpath)
+    
+    
+
 
 #test_txt_feeder_function()    
 #test_outlier_function()
-test_load_all_vals()
+#test_load_all_vals()
+test_csv_writer()
 print('Done!')
