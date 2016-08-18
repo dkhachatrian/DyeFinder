@@ -4,30 +4,33 @@
 
 Helpers for DyeFinder.
 
+For the most part, this contains the data processing and visualization
+components of the program. (Visualizations are output to file.)
+
 """
 
 
 
-import sys
+#import sys
 from PIL import Image
 import numpy as np
-from matplotlib import colors
-from matplotlib import cm
-import shutil
-import filecmp
+#from matplotlib import colors
+#from matplotlib import cm
+#import shutil
+#import filecmp
 
 import matplotlib.pyplot as plt
 plt.ioff() #ensure no windows are opened while running the script
-from collections import defaultdict
+#from collections import defaultdict
 
-import pickle
+#import pickle
 import os
-import statistics as s
-import numpy as np
+#import statistics as s
+#import numpy as np
 
 from lib import globe as g
 
-from matplotlib.colors import LogNorm
+#from matplotlib.colors import LogNorm
 
 
 # so can throw exception at bad locations
@@ -35,112 +38,18 @@ class HelperException(Exception):
     pass
 
 
-def write_dict_of_dicts_as_csv(dd, out_path):
-    """
-    Given a dict of dict of lists, produces a csv at out_path
-    with each dict separated into different columns.
-    """
-    # Adapted from http://stackoverflow.com/questions/23613426/write-dictionary-of-lists-to-a-csv-file
-    
-    
-    import csv
-    
-    with open(out_path, "w") as outf:
-        writer = csv.writer(outf, delimiter = ",") #should naturally work when opened in Excel now
-        for dict_label in dd:
-            d = dd[dict_label]
-#            writer.writerow(dict_label)
-            outf.write('{0}\n'.format(dict_label))
-            value_labels = sorted(d.keys())
-            writer.writerow(value_labels)
-            writer.writerows(zip(*[d[key] for key in value_labels]))
-            
-#    with open(out_path, 'w') as outf:
-#        for dict_label in dd:
-#            
 
 
 
 
-def prompt_user_to_set_up_files():
-    """
-    Gives user time to set up files before the script continues.
-    """
-    while True:
-        print("Hello! Please set up the dependencies folder with the folder structure desired in the output directory.")
-        print("Paired images (i.e., an NSC-stained image and its adjacent slice) should be saved with the same prefix and be saved with either '{0}.tif' or '{1}.tif' at the end, depending on whether it is the NSC-stained or membrane-stained slices, respectively.".format(g.NSC_LABEL, g.ANISO_LABEL))
-        print("The paired images should have the same filename prefix, separated from the rest of the filename with a '{0}'".format(g.PREFIX_SEPARATOR))
-        print("Currently, the image filenames cannot have parenthesis in them. (This breaks all ImageJ macros, as of version 1.51e.)")
-        print("Type 'q' to quit. Otherwise, press Enter when the files are set up as desired:")
-        uin = input()
-        if uin == 'q':
-            sys.exit()
-        else:
-            return
-
-
-def get_ImageJ_location(platform):
-    """
-    Get absolute path to an instance of Fiji, with OrientationJ installed.
-    Does not perform rigorous testing of whether you in fact pointed to a valid copy of ImageJ -- just checks that the user pointed to a file.
-    """
-    print("Hello! Please ensure your copy of ImageJ has the OrientationJ plugin installed.")
-    if platform == 'win32': #windows
-        while True:
-            uinput = input("Please input the absolute path to your ImageJ executable, with directories separated by either only slashes ('/') or only backslashes ('\\'):\n")
-            #first split
-            parts = uinput.split('/')
-            if len(parts) == 1:
-                parts = uinput.split('\\')
-                    
-
-#            ijpath = os.sep.join(parts)
-#            #because for some reason, os.path.join is silly about drive letters            
-            
-            
-            #'manually' add in os.sep after drive letter (containing a ':')
-            # otherwise, drive letter is not followed by os.sep
-            # when using os.sep.join
-            parts = [''.join([p, os.sep]) if ':' in p else p for p in parts]
-            ijpath = os.path.join(*parts)
-            #now re-split and os.path.join()
-            #otherwise, drive letter is not followed by os.sep
-            if os.path.isfile(ijpath):
-                return ijpath
-            else:
-                print("File not found! Please ensure you separated the path directories with slashes ('/').")
-    
-    if platform == 'darwin': #mac osx
-        relpath = os.path.join('Contents','MacOS', 'ImageJ-macosx') #from Fiji.app to actual executable
-        while True:
-            print("Please input the directory of the Fiji package, separated by slashes ('/').")
-            print("Type 'q' and press Enter to quit.")
-            print("Press Enter without typing anything to check the default location of '/Applications/Fiji.app':")
-            uinput = input("Type your response now:\n")
-            
-            if uinput == '':
-                uinput = '/Applications/Fiji.app'
-            
-            parts = uinput.split('/')
-            
-            
-            
-            # manually feed back in the first os.sep,
-            # as the '' in parts is disregarded by os.path.join
-            ijpath = os.sep + os.path.join(*parts, relpath)
-            
-            if os.path.isfile(ijpath):
-                return ijpath
-            else:
-                print("File not found! Please ensure you separated the path directories with slashes ('/').")
-            
 
 
 
-def make_validity_mask(data, z = 4):
+
+def find_outliers(data, z = 4):
     """
     Input: a NumPy array, corresponding to the intensity of its respective image.
-    Returns: a NumPy of type bool, with shape data.shape, where elements marked 'False' were deemed outliers and are to be ignored when performing further analysis. Also returns a list of those coordinates marked as outliers.
+    Returns: a list of those coordinates marked as outliers.
     In this case, an 'outlier' is more than z standard deviations above or below the mean.
     (In general, these intensity distributions seem to be strongly right-tailed...)
     """
@@ -153,44 +62,24 @@ def make_validity_mask(data, z = 4):
     
     low,high = mean - z*std, mean + z*std
     
-    valid_mask = np.ndarray(data.shape, dtype = bool)
-    valid_mask.fill(True) #most will not be outliers
-    
+#    valid_mask = np.ndarray(data.shape, dtype = bool)
+#    valid_mask.fill(True) #most will not be outliers
+
     outliers = []    
     
-    indexer = np.ndindex(valid_mask.shape)
+    indexer = np.ndindex(data.shape)
     
     for i in indexer:
         if data[i] < low or data[i] > high:
-            valid_mask[i] = False #marked as outlier
+#            valid_mask[i] = False #marked as outlier
             outliers.append(i)
 #        else:
 #            valid_mask[i] = True
     
-    return valid_mask, outliers
+#    return valid_mask, outliers
+    return outliers
 
-#def get_outliers(data):
-#    """
-#    Input: a NumPy array, corresponding to the intensity of its respective image.
-#    Returns: a list of those coordinates marked as outliers.
-#    In this case, an 'outlier' is above the 99.5th percentile.
-#    """
-#    indexer = np.ndindex(data)
-#    num_tups = [] #will be L value, then original coordinate
-#    
-#    for i in indexer:
-#        num_tups.append((data[i], i))
-#    
-#    num_tups = sorted(num_tups, key = lambda x: x[0]) #sort by luminance
-#    
-#    decile = 0.995
-#    cutoff = int(decile*len(num_tups))
-#    
-#    outliers = [c[1] for c in num_tups[cutoff:]]
-#    
-#    return outliers
-#    
-    
+
 
 
 
@@ -220,148 +109,10 @@ def remove_background(data):
     return popped
 
 
-def get_image(im_flag, fpath = None):
-    """
-    Prompts user for name of image, looking in the dependencies directory.
-    Returns the filename, and a PIL.Image of the associated file.
-    
-    If im_flag is set to g.BATCH, opens the image found at fpath.
-    """
-
-    if im_flag == g.BATCH:
-        im = Image.open(os.path.join(g.dep, fpath))
-        file_name = os.path.basename(fpath)
-        return file_name, im
-    
-    while True:
-        try:
-            if im_flag == g.ANISO_IM:
-                file_name = input("Please state the name of the file corresponding to the Text Images to be input, or enter nothing to quit: \n")
-            elif im_flag == g.DYE_IM:
-                file_name = input('Please input the filename (in the dependencies folder) corresponding to the stained image:\n')
-            if file_name == '':
-                sys.exit()
-            im = Image.open(os.path.join(g.dep, file_name))
-            break
-        except FileNotFoundError:
-            print("File not found! Please check the spelling of the filename input, and ensure the filename extension is written as well.")
-            continue
-        except IOError: #file couldn't be read as an Image
-            print("File could not be read as an image! Please ensure you are typing the filename of the original image..")
-            continue
-        
-    
-    return file_name, im
-    
-    
-def get_aniso_data(flag = None, root = None, relpath = None):
-    """
-    Prompts user for names of files corresponding to outputs of OrientationJ's parameters: orientation, coherence, and energy.
-    Input files are searched for in the relative path from root.
-    Input files must have been saved as a Text Image using ImageJ.
-    
-    Returns a dict of array coordinate-->coord_info (a namedtuple)
-    
-    If flag is set to g.BATCH, will look in relpath (relative to ./dependencies/) to find appropriate .txt files to construct the dictionary.
-    """
-    data_names = ['orientation', 'coherence', 'energy']
-    EXPECTED_LENGTH = len(data_names)
-    #fnames = []
-    
-    if flag == g.BATCH:
-        data_list = {}
-        fdir = os.path.join(root, relpath)
-        #changing = True #will keep track of whether len(data_list) changes
-        
-        for fname in [x for x in os.listdir(fdir) if x.endswith('.txt')]:
-            for label in data_names:
-                if label in fname:
-                    with open(os.path.join(fdir, fname), 'r') as inf:
-                        d_layer = np.loadtxt(inf, delimiter = '\t')
-                    #fnames.append(fname)
-                    data_list[label] = d_layer
-                    data_names.remove(label)
-                    break
-        
-#        while changing:
-#            if len(data_list) == len(data_names):
-#                break
-#            changing = False
-#            for fname in os.listdir(fdir):
-#                if fname.endswith('.txt') and data_names[len(data_list)] in fname:
-#                    changing = True
-#                    with open(os.path.join(fdir, fname), 'r') as inf:
-#                        d_layer = np.loadtxt(inf, delimiter = '\t')
-#                    fnames.append(fname)
-#                    data_list.append(d_layer)
-#                    break
-        if len(data_list) != EXPECTED_LENGTH:
-            raise HelperException("Not enough in .txt files found in {0} when running h.get_aniso_data in batch mode!".format(relpath))
-    
-    #else    
-    else:
-        data_list = {}
-        while len(data_list) < EXPECTED_LENGTH:
-            try:
-                file_name = input("Please state the name of the file corresponding to the " + str(data_names[len(data_list)]) + " for the image of interest (saved as a Text Image from ImageJ), or enter nothing to quit: \n")
-                with open(os.path.join(g.dep, file_name), 'r') as inf:
-                    d_layer = np.loadtxt(inf, delimiter = '\t')
-                #fnames.append(file_name)
-                data_list[data_names[len(data_list)]] = d_layer
-            except FileNotFoundError:
-                print('File not found! Please ensure the name was spelled correctly and is in the dependencies directory.')
-            except ValueError:
-                print('File structure not recognized! Please ensure the file was spelled correctly and was saved as a Text Image in ImageJ.')
-    
-    #TODO: clean up this implementation...
-    
-    data_shape = data_list['orientation'].shape
-    data_index = np.ndindex(data_shape)
-    tupled_data = {} #dictionary of data_array_coordinate s --> coord_infos    
-    #tupled_data = np.ndarray(data_shape).tolist()
-    
-    oris, cohs, eners = data_list['orientation'], data_list['coherence'], data_list['energy']
-    
-    for i in data_index: 
-        c_info = g.coord_info(coord=tuple(reversed(i)), orientation=oris[i], coherence=cohs[i], energy=eners[i])
-        tupled_data[i] = c_info#np.array(c_info)
-        
-    # TODO: combine pixels together to improve signal-to-noise ratio?
-            
-        
-    return tupled_data
-
-    
-    
-    
-#    
-#def get_color_of_interest():
-#    """
-#    Prompt user for RGB value of color of interest.
-#    Returns an HSV tuple with values in range [0,1].
-#    """
-#    
-#    print('Please open your image in ImageJ and point your cursor to a pixel whose color is representative of the stain of interest.')
-#    
-#    while True:
-#        try:
-#            tup = input("Please type the RGB tuple corresponding to the pixel of interest. There should be three numbers, separated by commas, with values falling within [0,255]:\n")
-#            tup.strip('() ')
-#            c_rgb = [int(x)/g.MAX for x in tup.split(',')]
-#            if len(c_rgb) != 3:
-#                print('Error! Not enough numbers entered. Please try again.')
-#                continue
-#            elif min(c_rgb) < 0 or max(c_rgb) > 1:
-#                print('Error! Numbers does not fall within the expected range of [0,255]. Please try again.')
-#                continue
-#            break
-#        except ValueError:
-#            print('Error! Numbers not entered. Please try again.')
-#            continue
-#    
-#    return tuple(colors.rgb_to_hsv(c_rgb))
 
 
+    
+    
 
 
 
@@ -370,6 +121,11 @@ def collect_coords_of_interest(image, ignore_list = None, color = 'brown'):
     Collect coordinates in the image that is close to color (HSV tuple).
     Coords will be in data_array order, *not* in image (x,y) order.
     Coords will not contain any elements of ignore_list
+    
+    HSV thresholding bounds are obtained by manually performing the thresholding
+    once (in e.g. ImageJ).
+    These bounds are manually recorded in globe.color2hsv_thresh
+    
     Returns the coordinates as a list.
     """
     
@@ -403,75 +159,11 @@ def collect_coords_of_interest(image, ignore_list = None, color = 'brown'):
                 break
         if match == True:
             coords.append(i)
-#        match = True
-#        zipped = zip(im_data[i], color)
-#        for e in zipped:
-#            if abs(e[1]-e[0]) >= EPSILON: #comparing each element pairwise
-#                match = False
-#                break
-#        if match == True:
-#            coords.append(i)            
-#            #coords.append(tuple(reversed(i))) #flipped from array order to image order
         
     return coords
 
 
-#def plot_histogram_data(data, coords, outdir, fname, title, predicate, bins = 100, drange=(0,1)):
-#    """
-#    Bin datapoints corresponding to coordinates from a list (coords) to the data, according to a predicate function (predicate).
-#    The predicate function takes in a coord_info namedtuple, and outputs a value to be used to build the histogram.
-#    plot_histogram_data returns the output of plt.hist()
-#    Also saves figure to outdir with name fname.
-#    """
-#    #TODO: use numpy.histogram2d or numpy.histogramdd instead of plt.hist    
-#    
-#    #from lib import hist_plotter    
-#    
-#    # clear old information so no overlap between successive calls
-#    plt.cla()
-#    plt.clf()    
-#    
-#    pred_data = []
-#    
-#    for c in coords:
-#        pred_data.append(predicate(data[c]))
-#    
-#    # plot histogram using np.histogram so it doesn't force a new window to pop up
-#    hist_data = plt.hist(pred_data, bins, range=drange)
-##    hist, bin_edges = np.histogram(pred_data, bins, range=drange)
-##    plt.bar(bin_edges[:-1], hist, width = 1)
-##    plt.xlim(*drange)    
-##    #plt.xlim(min(bin_edges), max(bin_edges))
-#
-#    plt.title(title)
-#    #plt.show()
-#    
-#    hist_path = os.path.join(outdir, fname)
-#    # TODO: provide labels to graph...
-##    plt.show()
-#    plt.savefig(hist_path)
-##    with open(hist_path, 'w') as inf:
-##    
-#
-#    
-#    return hist_data
-#    #return (hist, bin_edges)
-#    
-    
-    
-#def create_plot(coords_dict, plot_type = 'histogram', cache_flag = True, cache_loc = None):
-#    """
-#    Uses plot_type to determine which plotting function to call.
-#    If cache_flag is set to True, saves pickled objects to specified cache_loc
-#    (which must be provided).
-#    
-#    """
-#    if cache_flag == True and cache_loc is None:
-#        raise HelperException("create_plot was called with cache_flag set to True and cache_loc unspecified!")
-#    
-#
-#    
-    
+
 
 def get_measures(data, coords, measures):
     """
@@ -496,7 +188,7 @@ def remove_low_values(data, epsilon):
     More forceful than remove_background function, but allows for
     attempts to log-scale the data when doing plt.colorbar() for plt.hist2d().
     """
-    
+    pass
     
 
     
@@ -512,6 +204,7 @@ def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100, dran
  
     #from matplotlib.colors import LogNorm
     
+    # have clean figure/axes to plot new histogram on
     plt.cla()
     plt.clf()
     
@@ -674,271 +367,8 @@ def plot_histogram_data(vals_dict, outdir, info, title_postfix, bins = 100, dran
     #return (H,edges)
 
 
-def save_to_cache(var, info):
-    """
-    Saves variable to cache directory as a pickled file, for later inspection.
-    """
-    fpath = os.path.join(g.cache_dir, info)
-    
-    with open(fpath, mode='wb') as outf:
-        pickle.dump(var, outf, pickle.HIGHEST_PROTOCOL)
-    
-
-def parse_dependencies(main_root = g.dep, im_ftypes = g.IMAGE_FILETYPES, ignore_starts_list = g.IGNORE_FILE_STARTS_LIST, ignore_dir_list = g.IGNORE_DIR_LIST):
-    """
-    For batch running of images in 'dependencies', set up directories in the 'outputs' folder.
-    Returns a dictionary of (relative paths from dependencies) -->
-    dictionaries of (prefix) --> g.prefix_info objects.
-    
-    Ignores files located in directories labeled '__ignore__'
-    """
-    
-    # TODO: pair up images in lists here to ensure no mixup in rest of script,
-    # when there is more than one set of images in one directory    
-    
-#    rel_paths, im_names_ll, related_info_ll, prefixes_ll = [], [], [], []
-    
-    rel_path2prefix_dict = {}
-    #prefix2fnames = {} #prefix--> (list of im_names, list of related_info)
-    
-    #im_names_lll = []
-    
-    #im_names_lll will hold all im_names_ll
-    #im_names_ll will hold pairs of images with the same beginning filename
-    
-    all_files_have_info = True
-    
-    for root, dirs, files in os.walk(main_root, topdown = True):
-        rel_path = os.path.relpath(root, main_root) #relative path from main_root to directory containing dirs and files
-#        im_names = []
-#        info_names = []
-        prefix2fnames = {}
-        
-        #remove values in ignore_list from dirs
-        for i in ignore_dir_list:
-            try:
-                dirs.remove(i)
-            except ValueError: #not in list
-                pass
-
-        for i in ignore_starts_list:
-            files = [f for f in files if not f.startswith(i)]
-        
-            
-        if len(files) == 0:
-            continue
-        #dirs = list(filter(lambda x: x not in ignore_list, dirs))
-        #removes directories with the same name as any string in ignore_list 
-        
-#        if '__ignore__' in dirs:
-#            dirs.remove('__ignore__')
-#        prefixes = []
-#        for f in files:
-#            prefixes.append(f.split(' ')[0]) #get all prefixes
-#            
-        
-        new_dirs = [g.out_dir, g.cache_dir]
-        prefixes = set([f.split(' ')[0] for f in files])
-        
-        
-        
-        for prefix in prefixes:
-            im_names = []
-            info_names = []
-            related_files = [f for f in files if f.startswith(prefix)]
-
-            #make dir for each prefix -- separates the graphs
-            for d in new_dirs:
-                try:
-                    os.makedirs(os.path.join(d, rel_path, prefix))
-                except os.error:
-                    pass #already exists
-            
-            
-            info_file_exists = False
-            
-            for f in related_files:
-#                # remove from files list to shorten it for next search (worth it?)
-#                files.remove(f)
-            
-                # get related files (which I currently hardcode as .txt's)
-                # make sure they changed the skeleton
-                if f.endswith('.txt') and not filecmp.cmp(os.path.join(root,f), g.sample_roi_skeleton_path):
-                    info_names.append(f)
-                    info_file_exists = True
-                    continue
-                
-                # get images
-                for im_ftype in im_ftypes:
-                    if f.endswith(im_ftype):
-
-                        
-                        im_names.append(f) #remember filenames found
-                        break #check next file    
-                
-            
-            if not info_file_exists:
-                
-                all_files_have_info = False
-                #place .txt stub to be filled out
-                txtname = "{0} ROI_info.txt".format(prefix)
-                new_txt_path = os.path.join(root, txtname)
-                
-                shutil.copy(g.sample_roi_skeleton_path, new_txt_path)
-                
-            
-            
-            prefix2fnames[prefix] = g.prefix_info(im_fnames = im_names, info_fnames = info_names)
-            
-            
-                
-        #also make aggregrate output/cache dir for each relative path
-        for d in new_dirs:
-            try:
-                os.makedirs(os.path.join(d,rel_path, g.aggregate_label))
-            except os.error:
-                pass
-        
-        
-#        if len(files) > 0:
-#            #see if there are .tif's (images to be processed) in the root dirctory
-#            prefixes_seen = []
-#            for f in files:
-#                fparts = f.split(' ')
-#                f_prefix = fparts[0]
-#                
-#                if f_prefix in prefixes_seen:
-#                    continue
-#                for im_ftype in im_ftypes:
-#                    if f.endswith(im_ftype):
-#                        #make dir for each directory containing tifs
-#                        #outputs
-#                        try:
-#                            os.makedirs(os.path.join(g.out_dir, rel_path))
-#                        except os.error:
-#                            pass #already exists
-#                        
-#                        #cached files (e.g., .txt's)
-#                        try:
-#                            os.makedirs(os.path.join(g.cache_dir, rel_path))
-#                        except os.error:
-#                            pass #already exists
-#                        
-#                        im_names.append(f) #remember filenames found
-#                        break #check next file
-#                
-#                prefixes_seen.append(fparts[0])
-                
-        
-        rel_path2prefix_dict[rel_path] = prefix2fnames
-        
-#        rel_paths.append(rel_path)
-#        im_names_ll.append(im_names)
-#        related_info_ll.append(info_names)
-#        prefixes_ll.append(prefixes)
-    
-    
-    if not all_files_have_info:
-        info_string = "Not all pairs of images had associated ROI_info.txt's!\
-        Please fill out the .txt stubs and re-run this program."
-        raise HelperException(info_string)
-    
-    return rel_path2prefix_dict
-        
-#    return rel_paths, im_names_ll, related_info_ll, prefixes_ll
-
-#def recursive_defaultdict(dd = defaultdict, levels = 0, dtype = None):
-#    """
-#    Specify a (defaultdict of)*levels of dtype.
-#    if levels < 1, simply returns dtype.
-#    """
-#    
-#    if levels < 1:
-#        return dtype
-#    if levels == 1:
-#        return defaultdict(dtype)
-#    # else
-#    return defaultdict(defaultdict, (levels - 1, dtype))
-    
 
 
-def load_all_vals(cache_dir, cache_flag = False):
-    """
-    Loads all pickled dictionaries within cache_dir to make one large dictionary,
-    using the list of pickled labels in that same directory.
-    Will be used to create a master dictionary of 'type of coordinate' --> 'value'
-    for all images in a directory.
-    Returns said dict.
-    
-    If cache_flag is set to True, saves the extended dictionary to relative
-    aggregate directory.
-    """
-    
-    #coordname2label2vals = defaultdict(defaultdict(list))
-    
-#    coordname2label2vals = defaultdict(lambda: defaultdict(list)) #will be dict of dict of lists
-#    coordname2label2vals = recursive_defaultdict(levels = 2, dtype = list)
-    #first, see if there's anything in the aggregate folder
-    
-#    for root, dirs, files in os.walk(cache_dir):
-#        if root != os.path.join(cache_dir, g.aggregate_label):
-#            continue
-#        
-#        if len(files) > 0:
-#            if 'dict.p' in files:
-#                with open(os.path.join(root, 'dict.p'), mode = 'rb') as inf:
-#                    coordname2label2vals = pickle.load(inf)
-#                    return coordname2label2vals
-    
-    coordname2label2vals = defaultdict(dict)
-    
-    dict_path = os.path.join(cache_dir, g.aggregate_label, 'dict.p')
-    #load cache if available
-    if os.path.exists(dict_path):
-        with open(dict_path, mode = 'rb') as inf:
-            coordname2label2vals = pickle.load(inf)
-            return coordname2label2vals
-    
-    for root, dirs, files in os.walk(cache_dir):
-        try:
-            dirs.remove(g.aggregate_label)
-        except ValueError:
-            pass
-        
-        relevant_files = [f for f in files if f.endswith('.p')] #only want pickled files
-        
-#        #first load labels
-#        for f in relevant_files:
-#            if f.endswith('list.p'):
-#                with open(os.path.join(root,f), mode='rb') as inf:
-#                    labels = pickle.load(inf)
-#                    break
-                
-        if len(relevant_files) == 0:
-            continue
-        
-        # load dictionary
-        for f in relevant_files:
-            if f.endswith('dict.p'):
-                with open(os.path.join(root,f), mode='rb') as inf:
-                    coord_name2vals_dict = pickle.load(inf)
-                    break
-                
-        #extend masterdict
-        for coord_name in coord_name2vals_dict:
-            vals_dict = coord_name2vals_dict[coord_name]
-            for val_label in vals_dict:
-                coordname2label2vals[coord_name].setdefault(val_label, []).extend(vals_dict[val_label])
-                # in the dict (value of defaultdict(dict)), if the label already
-                # exists, extend the list by the subdict's values
-                # otherwise, first set a default value of an empty list
-                # then extend the list.
-            
-    if cache_flag:
-        with open(dict_path, mode = 'wb') as out:
-            pickle.dump(coordname2label2vals, out, pickle.HIGHEST_PROTOCOL)
-            
-    return coordname2label2vals
 
 
 def map_marked_pixels(outpath, coords, image_shape, fname):
@@ -962,68 +392,7 @@ def map_marked_pixels(outpath, coords, image_shape, fname):
 
 
 
-def get_ROI_info_from_txt(info_path):
-    """
-    Input:
-    info = a path to a .txt file with specific formatting:
-            - ignore lines starting with '#'
-            - each new set of information is separated by '//' (and is labeled w)
-            - names found in labels (in function body), then an equals sign, followed by expected values
-    
-    Output:
-    a dict of dicts containing this information
-    """
-    import string
-    #from collections import defaultdict
-    #whitespace = ' \t\n'
-    ignore_char = '#'
-    newset_flag = '//'
-    assigner = '='
-    
-    info_dict = {}
-    info_dd = {}
-    label = None
-    
-    
-    
-    with open(info_path, mode = 'r', encoding = 'utf8') as inf:
-        for line in inf:
-            
-            if set(g.roi_var_names) == info_dict.keys() and label is not None:
-                info_dd[label] = info_dict
-                info_dict = {}
-                label = None
-                
-            if line.startswith(ignore_char) or line == '\n':
-                continue
-            
-            if newset_flag in line:
-                # ensure there's a valid label
-                parts = line.split(newset_flag)
-                parts = [x.strip(string.whitespace) for x in parts]
-                while True:
-                    try:
-                        parts.remove('')
-                    except ValueError:
-                        break
-                
-                label = '_'.join(parts)
-            
-            elif assigner in line:
-                parts = line.split(assigner)
-                parts = [x.strip(string.whitespace) for x in parts]
-                
-                assert len(parts) == 2
-                
-                # add to dict
-                if parts[0] in g.roi_var_names:
-                    info_dict[parts[0]] = eval(parts[1], {}, {})
-                    #the two empty dicts correspond to globals and locals
-                else:
-                    raise HelperException("Variable name '{0}' from file {1} not recognized by script as an expected variable!".format(s[0], info_path))
-                
-    return info_dd
-                
+
                 
 def make_coords_list(d):
     """
@@ -1046,7 +415,9 @@ def make_coords_list(d):
     return coords_list
 
 
-
+## Note: get_coords is currently deprecated by manual delineation of the ROIs,
+## fed into the program using data_input.get_ROI_info_from_txt
+##
 #def get_coords(data, data_mask, predicate, quant_flag = g.LOW):
 #    """
 #    Get coords in data that pass a predicate function.

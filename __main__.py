@@ -9,6 +9,7 @@ Hi PowerPoint!
 """
 
 from lib import helpers as h
+from lib import data_io as dio
 from lib import globe as g
 from lib import aniso_measures as a
 import numpy as np
@@ -28,7 +29,7 @@ from sys import platform as _platform
 
 np.set_printoptions(precision = 3)
 
-imagej_loc = h.get_ImageJ_location(_platform)
+imagej_loc = dio.get_ImageJ_location(_platform)
 ij_macro_loc = os.path.join(g.lib, 'aniso_macro.ijm')
 macro_label = 'macro_performed_list.txt'
 
@@ -37,7 +38,7 @@ oj_labels = ['coherence.txt', 'orientation.txt', 'energy.txt']
 # NOT LINKED WITH MACRO. If macro changes, the above needs to change.
 # 
 
-h.prompt_user_to_set_up_files()
+dio.prompt_user_to_set_up_files()
 
 #aniso_measures = h.choose_measures()
 
@@ -47,7 +48,7 @@ aniso_measures = [a.coherence, a.energy] #2d
 # remove_outliers = h.should_remove_outliers()
 remove_outliers = False
 
-relpath2prefix2info = h.parse_dependencies()
+relpath2prefix2info = dio.parse_dependencies()
 
 aggregates_different_flag = False
 
@@ -102,7 +103,7 @@ for rel_path in relpath2prefix2info:
         
             for f in related_info_fnames:
                 info_path = os.path.join(g.dep, rel_path, f)
-                info_ddl.append(h.get_ROI_info_from_txt(info_path))
+                info_ddl.append(dio.get_ROI_info_from_txt(info_path))
                 #white_matter, gray_matter, injection_site = h.get_roi_info(info_path)
             
             
@@ -144,7 +145,7 @@ for rel_path in relpath2prefix2info:
             for dep_im_fname in dep_im_fnames:
                 #if dep_im_fname.endswith('.tif'):
                 if g.ANISO_LABEL in dep_im_fname:
-                    aniso_fname, aniso_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+                    aniso_fname, aniso_im = dio.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
                     
                     # generate the Text Images if not already created
                     im_path = os.path.join(g.dep, rel_path, aniso_fname)
@@ -183,7 +184,7 @@ for rel_path in relpath2prefix2info:
                         
                     
                 elif g.NSC_LABEL in dep_im_fname:
-                    dye_fname, dye_im = h.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+                    dye_fname, dye_im = dio.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
         
         
         
@@ -205,7 +206,7 @@ for rel_path in relpath2prefix2info:
             
             
             start = time.clock()
-            aniso_data = h.get_aniso_data(flag = g.BATCH, root = g.cache_dir, relpath = os.path.join(rel_path, prefix)) #for anisotropy data
+            aniso_data = dio.get_aniso_data(flag = g.BATCH, root = g.cache_dir, relpath = os.path.join(rel_path, prefix)) #for anisotropy data
             #aniso_fname, aniso_im = h.get_image(g.ANISO_IM)
             end = time.clock()
             print("get_aniso_data took {0} seconds for an image with {1} pixels.".format(end-start, reduce(lambda x,y: x*y, im_data_shape)))
@@ -241,19 +242,7 @@ for rel_path in relpath2prefix2info:
             end = time.clock()
             print("coords_of_interest pruning took {0} seconds for an image with {1} coordinates in the ignore_list.".format(end-start, len(ignore_coords)))
             
-            
-        #    # TODO: Slow. Speed up?
-        #    start = time.clock()
-        #    high_aniso_coords, method_high = h.get_coords(aniso_data, data_mask = validity_mask, predicate = h.has_high_aniso) #eg, in this case, white matter
-        #    end = time.clock()
-        #    print("Getting high_aniso_coords took {0} seconds and ended up using method_high={1}.".format(end-start, method_high))
-        #    
-        #    start = time.clock()
-        #    low_aniso_coords, method_low = h.get_coords(aniso_data, data_mask = validity_mask, predicate = h.has_low_aniso) #eg, in this case, gray matter
-        #    end = time.clock()
-        #    print("Getting high_aniso_coords took {0} seconds and ended up using method_high={1}.".format(end-start, method_low))
-        #    
-            
+
             # not the most refined ingesting of info ...
             # currently operating on the 'one info.txt per pair' mindset
             # (to develop this quickly)
@@ -375,7 +364,7 @@ for rel_path in relpath2prefix2info:
     # TODO: load appropriate dictionary files. Obtain directory-wide list of values. Plot
     rel_cache_dir = os.path.join(g.cache_dir, rel_path)
     start = time.clock()
-    labels2vals_dicts = h.load_all_vals(rel_cache_dir, cache_flag = True)
+    labels2vals_dicts = dio.load_all_vals(rel_cache_dir, cache_flag = True)
     end = time.clock()
     print("Creating/loading the aggregate dictionary for {0} took {1} seconds.".format(rel_path, end-start))
     
