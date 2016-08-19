@@ -328,11 +328,10 @@ for rel_path in relpath2prefix2info:
 #            coord_labels = list(coords_dict.keys())
 #            
             #dump dict and labels, to refind appropriate values later
-    #        with open(os.path.join(rel_prefix_cache_dir, 'coord_labels list.p'), mode = 'wb') as out:
-    #            pickle.dump(coord_labels,out,pickle.HIGHEST_PROTOCOL)
-    #            
             with open(cached_dict_loc, mode = 'wb') as out:
                 pickle.dump(coord_name2vals_dict,out,pickle.HIGHEST_PROTOCOL)
+                
+
             
             
             h.map_marked_pixels(outpath = out_dir, coords = coords_of_interest, image_shape = dye_im.size, fname = '{0} dye_marked_pixels.png'.format(f_prefix))
@@ -342,6 +341,10 @@ for rel_path in relpath2prefix2info:
             #end manual dict creation
             
             
+        start = time.clock()       
+        dio.write_dict_of_dicts_as_csv(dd = coord_name2vals_dict, out_path = out_dir)   
+        end = time.clock()
+        print("Writing CSV's into {0} took {1} seconds.".format(out_dir, end-start))        
             
         #now plot the dict (either made from scratch or loaded from pickled file)
         for label in coord_name2vals_dict:
@@ -359,16 +362,21 @@ for rel_path in relpath2prefix2info:
         print() #one newline space between paired image lists
 
 
-
+    out_dir = os.path.join(g.out_dir, rel_path, g.aggregate_label)
     # aggregate across entire directory
-    # TODO: load appropriate dictionary files. Obtain directory-wide list of values. Plot
     rel_cache_dir = os.path.join(g.cache_dir, rel_path)
     start = time.clock()
     labels2vals_dicts = dio.load_all_vals(rel_cache_dir, cache_flag = True)
     end = time.clock()
     print("Creating/loading the aggregate dictionary for {0} took {1} seconds.".format(rel_path, end-start))
     
-    out_dir = os.path.join(g.out_dir, rel_path, g.aggregate_label)
+    
+    start = time.clock()       
+    dio.write_dict_of_dicts_as_csv(dd = labels2vals_dicts, out_path = out_dir)   
+    end = time.clock()
+    print("Writing CSV's into {0} took {1} seconds.".format(out_dir, end-start))    
+    
+
     for label in labels2vals_dicts:
         vals = labels2vals_dicts[label]
         n_bins = 100

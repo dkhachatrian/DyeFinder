@@ -455,20 +455,38 @@ def load_all_vals(cache_dir, cache_flag = False):
 
 def write_dict_of_dicts_as_csv(dd, out_path):
     """
-    Given a dict of dict of lists, produces a csv at out_path
-    with each dict separated into different columns.
+    Given a dict of dict of lists, produces csv's at out_path (a directory)
+    with values in separate columns.
+    Each CSV file corresponds to one dictionary, labeled in the filename.
+    
+    Overwrites file without regard to previous existence or using replicate data.
+    (So that if the cache is deleted, CSV files get updated with any new data
+    that may have been placed that have the same prefix as a previous fileset.)
     """
     # Adapted from http://stackoverflow.com/questions/23613426/write-dictionary-of-lists-to-a-csv-file
     
     
     import csv
     
-    with open(out_path, "w") as outf:
-        writer = csv.writer(outf, delimiter = ",") #should naturally work when opened in Excel now
-        for dict_label in dd:
-            d = dd[dict_label]
+    csv_label = "CSVs"
+    
+    try:
+        os.makedirs(os.path.join(out_path,csv_label))
+    except os.error:
+        pass #already exists
+
+    
+    for dict_label in dd:
+        fname = "{0} dict.csv".format(dict_label)
+        d = dd[dict_label]
+        
+        csv_path = os.path.join(out_path, csv_label, fname)
+        
+        
+        with open(csv_path, "w") as outf:
+            writer = csv.writer(outf, delimiter = ",") #should naturally work when opened in Excel now
 #            writer.writerow(dict_label)
-            outf.write('{0}\n'.format(dict_label))
+#                outf.write('{0}\n'.format(dict_label))
             value_labels = sorted(d.keys())
             writer.writerow(value_labels)
             writer.writerows(zip(*[d[key] for key in value_labels]))
