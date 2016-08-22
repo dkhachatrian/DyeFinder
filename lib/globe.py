@@ -2,6 +2,8 @@
 
 """
 Globals for DyeFinder.
+
+@author: David G. Khachatrian
 """
 #### To ensure the working directory starts at where the script is located...
 import os
@@ -78,6 +80,11 @@ EPSILON = 0.01 #for use in removing background
 # used in h.get_coords_of_interest() to get pixels with a specific color
 # HSV tuple bounds should be obtained manually once, then added here
 # with order color_name-->[H_bounds,S_bounds,V_bounds]
+
+# it doesn't seem like colors.cnames RGB tuples are entirely trustworthy
+# (at least, when I looked up the hex value for 'brown', the color seemed
+# way off)
+# so may have to manually threshold for colors and add to dictionary
 color2hsv_thresh = { 'brown': [(9,23),(63,209),(0,196)] } 
 
 

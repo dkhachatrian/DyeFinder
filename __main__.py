@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
-
 Finds pixels with specified color and coregisters them with anisotropy data. Produces a histogram showing distribution of pixels of interest with anisotropy information at said pixel.
 
-Hi PowerPoint!
-
+@author: David G. Khachatrian
 """
 
 from lib import helpers as h
@@ -18,7 +16,7 @@ import subprocess
 #from collections import namedtuple
 import time
 from functools import reduce
-from collections import defaultdict
+#from collections import defaultdict
 import pickle
 
 
@@ -50,9 +48,13 @@ remove_outliers = False
 
 relpath2prefix2info = dio.parse_dependencies()
 
+# should the script treat the aggregates differently from individual dicts?
 aggregates_different_flag = False
 
 color_of_interest = 'brown'
+
+should_cache_aggregate = False
+should_cache_individual = False
 
 
 #run ImageJ macros to get OrientationJ measures (?)
@@ -69,8 +71,6 @@ for rel_path in relpath2prefix2info:
     
     print() #two newline spaces between directories
     print("Now working on files in {0}...".format(os.path.join(g.dep,rel_path)))    
-    
-    labels2allvals = defaultdict(list)
     
     
     for prefix in prefix_dict:
@@ -111,7 +111,7 @@ for rel_path in relpath2prefix2info:
             
             macro_path = os.path.join(g.cache_dir,rel_path,prefix, macro_label)
             
-            #create macro list if necessary
+            #create macro list file if necessary
             try:
                 with open(macro_path, mode = 'x') as inf:
                     pass
@@ -211,13 +211,13 @@ for rel_path in relpath2prefix2info:
             end = time.clock()
             print("get_aniso_data took {0} seconds for an image with {1} pixels.".format(end-start, reduce(lambda x,y: x*y, im_data_shape)))
             
-            # allows for log scale            
+            
             h.remove_low_values(data = aniso_data, epsilon = 0.001) 
             
             
             
-    #        validity_mask, outlier_coords = h.make_validity_mask(np.array(aniso_im.convert('L')), z = Z)
-            outlier_coords = []
+            outlier_coords = [] # currently not dealing with outliers
+            # TODO: remove line-like image artifacts
             
             
             # for when using quantile method of getting outliers...
@@ -235,10 +235,10 @@ for rel_path in relpath2prefix2info:
             
             
             
-            #coords_of_interest = h.collect_coords_of_interest(dye_im, color = color_of_interest)
             
             start = time.clock()
             coords_of_interest = h.collect_coords_of_interest(dye_im, ignore_list = ignore_coords, color = color_of_interest)
+            #coords_of_interest = h.collect_coords_of_interest(dye_im, color = color_of_interest) #future feature?
             end = time.clock()
             print("coords_of_interest pruning took {0} seconds for an image with {1} coordinates in the ignore_list.".format(end-start, len(ignore_coords)))
             
@@ -260,10 +260,6 @@ for rel_path in relpath2prefix2info:
             for label in roi_info_dd:
                 roi_info_dd[label]['coords'] = h.make_coords_list(roi_info_dd[label])
                 
-        #    high_aniso_coords, method_high = [], 'debugging'
-        #    low_aniso_coords, method_low = [], 'debugging'
-            
-            #remove now
             
             
             
@@ -274,10 +270,7 @@ for rel_path in relpath2prefix2info:
             
             
             for c in roi_info_dd['INJECTION_SITE']['coords']:
-                try:
-                    dye_coords_no_ij.pop(c) #O(1)
-                except KeyError:
-                    pass
+                dye_coords_no_ij.pop(c, None) #O(1)
             
             dye_coords_no_ij = list(dye_coords_no_ij.keys())
             
@@ -290,59 +283,38 @@ for rel_path in relpath2prefix2info:
                 coords_dict[label] = roi_info_dd[label]['coords']
             
             
-        #        #naming histograms...
-        #        coords_dict = {'dye_coords': coords_of_interest, \
-        #        'high_aniso_coords method={0}'.format(method_high): high_aniso_coords, \
-        #        'low_aniso_coords method={0}'.format(method_low): low_aniso_coords, \
-        #        'all_coords_(no_bg_or_artifacts)': aniso_data.keys()}
-            
-            #clean coords in coords_list of any outlier or background coordinates...
-            
-            #save label2vals, so that a directory-wide list can be obtained
-    
-    #        h.create_plot(data = aniso_data, coords_dict = coords_dict, plot_type = 'histogram', cache_flag = True, cache_loc = rel_cache_dir)
             coord_name2vals_dict = {}
             
             #build dict
             for coords_name in coords_dict:
                 coords = coords_dict[coords_name]
-#                n_bins = 100 #can be sequence if dimension_number>1
-#                hist_info = [dye_fname, color_of_interest, coords_name, len(coords), g.hist_ftype]
-#                #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename
-#                title_p = "for specified group: {0}".format(coords_name)
-#                
-#                label2vals = h.get_measures(data = aniso_data, coords = coords, measures = aniso_measures)
-#                
                 coord_name2vals_dict[coords_name] = h.get_measures(data = aniso_data, coords = coords, measures = aniso_measures)
-                
-                # dump the dictionaries, for use afterward
-#                fname = '{0} dict.p'.format(coords_name)
-    #            with open(os.path.join(rel_prefix_cache_dir, fname), mode = 'wb') as out:
-    #                pickle.dump(label2vals, out, pickle.HIGHEST_PROTOCOL)
-                
-#                h.plot_histogram_data(vals_dict = label2vals, outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins)
-            
+
+
+
             #unload the fairly large dict to allow for garbage collection
             aniso_data = None
             
-#            coord_labels = list(coords_dict.keys())
-#            
-            #dump dict and labels, to refind appropriate values later
-            with open(cached_dict_loc, mode = 'wb') as out:
-                pickle.dump(coord_name2vals_dict,out,pickle.HIGHEST_PROTOCOL)
-                
 
-            
-            
             h.map_marked_pixels(outpath = out_dir, coords = coords_of_interest, image_shape = dye_im.size, fname = '{0} dye_marked_pixels.png'.format(f_prefix))
             h.map_marked_pixels(outpath = out_dir, coords = bg_coords, image_shape = dye_im.size, fname = '{0} bg_pixels.png'.format(f_prefix)) #debugging
             #h.map_marked_pixels(outpath = out_dir, coords = outlier_coords, image_shape = dye_im.size, fname = '{0} outlier_pixels z={1}.png'.format(f_prefix, Z)) #debugging
+
+            
+            #dump dict and labels, to refind appropriate values later
+            # for large images, dicts may be obscenely large
+            # NOTE: disabling caching of the individual dicts
+            # will make aggregation through the script impossible!
+            # However, will still export to CSV (see below)
+            if should_cache_individual:
+                with open(cached_dict_loc, mode = 'wb') as out:
+                    pickle.dump(coord_name2vals_dict,out,pickle.HIGHEST_PROTOCOL)
             
             #end manual dict creation
             
             
         start = time.clock()       
-        dio.write_dict_of_dicts_as_csv(dd = coord_name2vals_dict, out_path = out_dir)   
+        dio.write_dict_of_dicts_as_file(dd = coord_name2vals_dict, out_path = out_dir)   
         end = time.clock()
         print("Writing CSV's into {0} took {1} seconds.".format(out_dir, end-start))        
             
@@ -356,6 +328,8 @@ for rel_path in relpath2prefix2info:
             
             h.plot_histogram_data(vals_dict = coord_name2vals_dict[label], outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins)
             
+        coord_name2vals_dict = {} #release data            
+        
         end_total = time.clock()
         
         print("It took {0} seconds to perform the operations on the paired image list {1}.".format(end_total-start_total, dep_im_fnames))
@@ -365,26 +339,39 @@ for rel_path in relpath2prefix2info:
     out_dir = os.path.join(g.out_dir, rel_path, g.aggregate_label)
     # aggregate across entire directory
     rel_cache_dir = os.path.join(g.cache_dir, rel_path)
-    start = time.clock()
-    labels2vals_dicts = dio.load_all_vals(rel_cache_dir, cache_flag = True)
-    end = time.clock()
-    print("Creating/loading the aggregate dictionary for {0} took {1} seconds.".format(rel_path, end-start))
     
+    #check if there are cached .p files in the relative cache directory
+    # if there isn't, can't build aggregate dictionary    
+    found_pickled_dict = False
+    for root, dirs, files in os.walk(rel_cache_dir, topdown = True):
+        if found_pickled_dict:
+            break
+        for f in files:
+            if f.endswith('dict.p'): #found at least one
+                found_pickled_dict = True
+                break
     
-    start = time.clock()       
-    dio.write_dict_of_dicts_as_csv(dd = labels2vals_dicts, out_path = out_dir)   
-    end = time.clock()
-    print("Writing CSV's into {0} took {1} seconds.".format(out_dir, end-start))    
-    
-
-    for label in labels2vals_dicts:
-        vals = labels2vals_dicts[label]
-        n_bins = 100
-        hist_info = ['aggregate', color_of_interest, label, len(vals['coherence']), g.hist_ftype]
-        #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename
-        title_p = "for specified group: {0}".format(label)
+    if found_pickled_dict: #perform aggregate dict activities
+        start = time.clock()
+        coord_name2vals_dict = dio.load_all_vals(rel_cache_dir, cache_flag = should_cache_aggregate)
+        end = time.clock()
+        print("Creating/loading the aggregate dictionary for {0} took {1} seconds.".format(rel_path, end-start))
         
-        h.plot_histogram_data(vals_dict = labels2vals_dicts[label], outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins, aggregate_flag = aggregates_different_flag) #, aggregate_flag = True
+        
+        start = time.clock()       
+        dio.write_dict_of_dicts_as_file(dd = coord_name2vals_dict, out_path = out_dir)   
+        end = time.clock()
+        print("Writing CSV's into {0} took {1} seconds.".format(out_dir, end-start))    
+        
+    
+        for label in coord_name2vals_dict:
+            vals = coord_name2vals_dict[label]
+            n_bins = 100
+            hist_info = ['aggregate', color_of_interest, label, len(vals['coherence']), g.hist_ftype]
+            #hist_info = "dye_imagename={0} color_of_interest={1} {2} (n={3}) histogram (bins={4}).{5}".format(dye_fname, color_of_interest, coords_name, len(coords), n_bins, hist_ftype) #filename
+            title_p = "for specified group: {0}".format(label)
+            
+            h.plot_histogram_data(vals_dict = coord_name2vals_dict[label], outdir = out_dir, info = hist_info, title_postfix = title_p, bins = n_bins, aggregate_flag = aggregates_different_flag) #, aggregate_flag = True
 
 
 print('Done!')

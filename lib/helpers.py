@@ -7,6 +7,7 @@ Helpers for DyeFinder.
 For the most part, this contains the data processing and visualization
 components of the program. (Visualizations are output to file.)
 
+@author: David G. Khachatrian
 """
 
 
@@ -37,6 +38,28 @@ from lib import globe as g
 class HelperException(Exception):
     pass
 
+
+
+
+class TextImageReader:
+    """
+    A class to access data housed in files whose structure mimicks that of
+    the "Save As...Text Image" option in ImageJ.
+    
+    Useful for very high-resolution images where memory may be a concern, and
+    when saving manipulations performed on the Text Image-like file needn't
+    be performed.
+    (Or else, if necessary, could make a copy of the original file and perform
+    operations on them.)
+    
+    Motivation for this class: the resulting dictionaries (as measured by the size
+    of the pickled object relative to the original image) formed from running
+    DyeFinder on a 1586x1113 ~5 MB image were ~70 MB.
+    
+    So for the higher resolution ~700 MB images, would require ~10 GB memory
+    to hold dictionary...
+    """
+    pass
 
 
 

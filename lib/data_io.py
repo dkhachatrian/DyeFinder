@@ -3,6 +3,8 @@
 """
 Functions that collect data or file locations, through user input or
 pre-existing relationships, that are needed for the analysis.
+
+@author: David G. Khachatrian
 """
 
 from lib import globe as g
@@ -45,6 +47,7 @@ def get_ImageJ_location(platform):
     """
     Get absolute path to an instance of Fiji, with OrientationJ installed.
     Does not perform rigorous testing of whether you in fact pointed to a valid copy of ImageJ -- just checks that the user pointed to a file.
+    (Has default location for MacOSX.)
     """
     print("Hello! Please ensure your copy of ImageJ has the OrientationJ plugin installed.")
     if platform == 'win32': #windows
@@ -453,7 +456,7 @@ def load_all_vals(cache_dir, cache_flag = False):
 
 
 
-def write_dict_of_dicts_as_csv(dd, out_path):
+def write_dict_of_dicts_as_file(dd, out_path):
     """
     Given a dict of dict of lists, produces csv's at out_path (a directory)
     with values in separate columns.
@@ -468,23 +471,28 @@ def write_dict_of_dicts_as_csv(dd, out_path):
     
     import csv
     
-    csv_label = "CSVs"
+
+    
+    # I prefer tab-delimited .txt's, which could be read by Excel
+    out_label = "TXTs"
+    file_format = 'txt'
+    f_delimiter = '\t'
     
     try:
-        os.makedirs(os.path.join(out_path,csv_label))
+        os.makedirs(os.path.join(out_path,out_label))
     except os.error:
         pass #already exists
 
     
     for dict_label in dd:
-        fname = "{0} dict.csv".format(dict_label)
+        fname = "{0} dict.{1}".format(dict_label, file_format)
         d = dd[dict_label]
         
-        csv_path = os.path.join(out_path, csv_label, fname)
+        csv_path = os.path.join(out_path, out_label, fname)
         
         
         with open(csv_path, "w") as outf:
-            writer = csv.writer(outf, delimiter = ",") #should naturally work when opened in Excel now
+            writer = csv.writer(outf, delimiter = f_delimiter) #should naturally work when opened in Excel now
 #            writer.writerow(dict_label)
 #                outf.write('{0}\n'.format(dict_label))
             value_labels = sorted(d.keys())

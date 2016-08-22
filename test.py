@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 
 """
-Tests outlier choices, based on helpers.make_validity_mask
+Tests various functions in DyeFinder.
+
+@author: David G. Khachatrian
 """
 
 
@@ -62,7 +64,7 @@ def test_csv_writer():
     with open(dict_path, 'rb') as inf:
         dd = pickle.load(inf)
     
-    dio.write_dict_of_dicts_as_csv(dd, outpath)
+    dio.write_dict_of_dicts_as_file(dd, outpath)
     
     
 
