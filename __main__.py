@@ -18,6 +18,7 @@ import time
 from functools import reduce
 #from collections import defaultdict
 import pickle
+from PIL import Image
 
 
 from sys import platform as _platform
@@ -45,6 +46,8 @@ aniso_measures = [a.coherence, a.energy] #2d
 
 # remove_outliers = h.should_remove_outliers()
 remove_outliers = False
+
+
 
 relpath2prefix2info = dio.parse_dependencies()
 
@@ -145,10 +148,12 @@ for rel_path in relpath2prefix2info:
             for dep_im_fname in dep_im_fnames:
                 #if dep_im_fname.endswith('.tif'):
                 if g.ANISO_LABEL in dep_im_fname:
-                    aniso_fname, aniso_im = dio.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+#                    aniso_fname, aniso_im = dio.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+                    aniso_fname, aniso_im_path = dio.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
                     
                     # generate the Text Images if not already created
-                    im_path = os.path.join(g.dep, rel_path, aniso_fname)
+#                    im_path = os.path.join(g.dep, rel_path, aniso_fname)
+                    im_path = aniso_im_path
                     
                     #check to see if the file's been processed
                  #   if macro_label not in os.listdir(os.path.join(g.dep,rel_path)): 
@@ -184,11 +189,12 @@ for rel_path in relpath2prefix2info:
                         
                     
                 elif g.NSC_LABEL in dep_im_fname:
-                    dye_fname, dye_im = dio.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+                    dye_fname, dye_im_path = dio.get_image(g.BATCH, fpath = os.path.join(rel_path, dep_im_fname))
+                    dye_im = Image.open(dye_im_path)
         
         
         
-            im_data_shape = tuple(reversed(dye_im.size))
+#            im_data_shape = tuple(reversed(dye_im.size))
             
             f_prefix = dye_fname
             
@@ -209,7 +215,7 @@ for rel_path in relpath2prefix2info:
             aniso_data = dio.get_aniso_data(flag = g.BATCH, root = g.cache_dir, relpath = os.path.join(rel_path, prefix)) #for anisotropy data
             #aniso_fname, aniso_im = h.get_image(g.ANISO_IM)
             end = time.clock()
-            print("get_aniso_data took {0} seconds for an image with {1} pixels.".format(end-start, reduce(lambda x,y: x*y, im_data_shape)))
+            print("get_aniso_data took {0} seconds for an image with {1} pixels.".format(end-start, len(aniso_data)))
             
             
             h.remove_low_values(data = aniso_data, epsilon = 0.001) 

@@ -17,6 +17,15 @@ os.chdir(dname)
 from collections import namedtuple
 
 
+
+
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = None # disables upper limit of imagesize
+    # careful! Large files on weak computers could cause problems
+
+
+
+
 #coords_dict_keys = []
 
 sample_roi_skeleton_path = os.path.join(dname, 'skeletal ROI_info.txt')
@@ -48,6 +57,37 @@ PREFIX_SEPARATOR = ' '
 
 ROI_LABELS = ['WHITE_MATTER', 'GRAY_MATTER', 'INJECTION_SITE']
 roi_var_names = ['top_left_corner_pixel', 'dx', 'dy']
+
+
+
+# determine dependencies location
+# TODO: move function out of globe
+
+def get_image_directory(default_dir = None):
+    """
+    Allows user to specify their own dependencies folder (where the images and .txt's are).
+    Defaults to a dependencies folder in the script directory.
+    """
+    
+    while True:
+        print("Hello! Please state where the directory into which this program should look for images.")
+        print("Enter nothing to default to a dependencies folder in the directory of the script.")
+        dep_dir = input()
+        
+        if dep_dir == '':
+            dep_dir = default_dir
+            break
+        if os.path.isdir(dep_dir):
+            break
+        else:
+            print("Error! Input not a directory! Please try again.")
+    
+    return dep_dir
+
+
+dep = get_image_directory(default_dir = dep)
+
+
 
 
 out_dir = os.path.join(dname, 'outputs') #directory for output files

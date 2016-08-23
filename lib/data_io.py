@@ -43,6 +43,8 @@ def prompt_user_to_set_up_files():
 
 
 
+
+
 def get_ImageJ_location(platform):
     """
     Get absolute path to an instance of Fiji, with OrientationJ installed.
@@ -289,29 +291,40 @@ def get_image(im_flag, fpath = None):
     """
 
     if im_flag == g.BATCH:
-        im = Image.open(os.path.join(g.dep, fpath))
+        im_path = os.path.join(g.dep, fpath)
+#        im = Image.open(im_path)
         file_name = os.path.basename(fpath)
-        return file_name, im
+        return file_name, im_path
     
     while True:
-        try:
-            if im_flag == g.ANISO_IM:
-                file_name = input("Please state the name of the file corresponding to the Text Images to be input, or enter nothing to quit: \n")
-            elif im_flag == g.DYE_IM:
-                file_name = input('Please input the filename (in the dependencies folder) corresponding to the stained image:\n')
-            if file_name == '':
-                sys.exit()
-            im = Image.open(os.path.join(g.dep, file_name))
-            break
-        except FileNotFoundError:
+        if im_flag == g.ANISO_IM:
+            file_name = input("Please state the name of the file corresponding to the Text Images to be input, or enter nothing to quit: \n")
+        elif im_flag == g.DYE_IM:
+            file_name = input('Please input the filename (in the dependencies folder) corresponding to the stained image:\n')
+        if file_name == '':
+            sys.exit()
+
+        im_path = os.path.join(g.dep, file_name)
+#        im = Image.open(im_path)
+        if os.path.isfile(im_path):
+            ok = False
+            for ftype in g.IMAGE_FILETYPES:
+                if im_path.endswith(ftype):
+                    ok = True
+                    break
+            if ok:
+                break
+        else:
             print("File not found! Please check the spelling of the filename input, and ensure the filename extension is written as well.")
             continue
-        except IOError: #file couldn't be read as an Image
-            print("File could not be read as an image! Please ensure you are typing the filename of the original image..")
-            continue
-        
+#        except FileNotFoundError:
+#
+#        except IOError: #file couldn't be read as an Image
+#            print("File could not be read as an image! Please ensure you are typing the filename of the original image..")
+#            continue
+#        
     
-    return file_name, im
+    return file_name, im_path
     
     
 
